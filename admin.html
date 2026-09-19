@@ -61,6 +61,9 @@
   .msg.ok{background:var(--ok-soft); color:var(--ok)}
   .msg.err{background:var(--warn-soft); color:var(--warn)}
   .msg.info{background:var(--accent-soft)}
+  a{color:var(--accent)}
+  summary{cursor:pointer; font-weight:600; margin-top:10px}
+  details p{margin:8px 0 0; font-size:15px}
   .linkback{background:none; border:0; padding:6px 0; font:inherit; font-weight:600; color:var(--muted); cursor:pointer}
   .linkback:hover{color:var(--accent)}
 </style>
@@ -77,6 +80,7 @@ const ENDPOINT = (window.CONFIG || {}).ENDPOINT || "";
 
 const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
 let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
+let verPost = false, postulantes = [], postCargando = false, postError = "", filtroPostVac = "todas", filtroPostEst = "todos";
 try{ clave = sessionStorage.getItem("clave_admin") || ""; }catch(e){}
 
 const $app = document.getElementById("app");
@@ -155,7 +159,7 @@ function vLista(){
     <input type="password" id="clave" value="${esc(clave)}" autocomplete="off">
     <p class="hint">La clave es la que pusiste en CLAVE_ADMIN dentro del Apps Script.</p>
     ${mensaje ? `<div class="msg ${mensaje.t}" role="status">${esc(mensaje.x)}</div>` : ""}
-    <div class="actions" style="margin:20px 0"><button class="btn solid" data-a="nueva">Nueva vacante</button></div>
+    <div class="actions" style="margin:20px 0"><button class="btn solid" data-a="nueva">Nueva vacante</button><button class="btn" data-a="postulantes">Ver postulantes</button></div>
     ${filas}`;
 }
 
@@ -205,8 +209,48 @@ function vForm(){
       <button class="btn" data-a="cancelar">Cancelar</button></div>`;
 }
 
+async function cargarPostulantes(){
+  postCargando = true; postError = ""; render();
+  try{
+    const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ tipo: "postulantes_listar", clave }) });
+    const j = await r.json();
+    if(j.ok){ postulantes = j.postulantes || []; }
+    else { postError = MOTIVOS[j.error] || ("El script rechazó la consulta (" + j.error + ")."); }
+  }catch(e){
+    postError = "No se pudieron cargar desde aquí. Puedes verlos directamente en la pestaña «Postulantes» de tu hoja de Google.";
+  }
+  postCargando = false; render();
+}
+
+function vPostulantes(){
+  const vacs = [...new Set(postulantes.map(p => p.vacante))].filter(Boolean);
+  const vis = postulantes.filter(p => (filtroPostVac === "todas" || p.vacante === filtroPostVac) && (filtroPostEst === "todos" || p.estado === filtroPostEst));
+  const aptos = postulantes.filter(p => p.estado === "Apto").length;
+  const cuerpo = postCargando ? `<p class="lead">Cargando postulantes…</p>`
+    : postError ? `<div class="msg err" role="alert">${esc(postError)}</div>`
+    : !postulantes.length ? `<div class="card"><p style="margin:0;color:var(--muted)">Todavía no hay postulantes.</p></div>`
+    : `<p class="hint" style="margin:12px 0 16px">${vis.length} de ${postulantes.length} postulantes (${aptos} aptos recibieron el link de entrevista).</p>` +
+      vis.map(p => `<div class="card"><div class="vrow">
+        <div><h2>${esc(p.nombre)}</h2><a href="mailto:${esc(p.correo)}">${esc(p.correo)}</a></div>
+        <span class="chip ${p.estado === "Apto" ? "on" : "off"}">${esc(p.estado)}</span></div>
+        <p class="hint" style="margin-top:8px">${esc(isNaN(new Date(p.fecha)) ? p.fecha : new Date(p.fecha).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }))}, ${esc(p.vacante)}</p>
+        <details><summary>Ver respuestas</summary>
+          <p><strong>Tiempo completo:</strong> ${esc(p.tiempoCompleto)}. <strong>Viaje planeado:</strong> ${esc(p.viaje)}. <strong>Inglés:</strong> ${esc(p.ingles)}.</p>
+          ${p.fallas ? `<p><strong>No cumple:</strong> ${esc(p.fallas)}</p>` : ""}
+          <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p></details></div>`).join("");
+  return `<button class="linkback" data-a="volver-lista">← Volver a las vacantes</button>
+    <h1 tabindex="-1">Postulantes</h1>
+    <p class="lead" style="margin-bottom:12px">Quienes completaron el prefiltro. «Apto» recibió el link de agendamiento; «En revisión» solo vio un mensaje de que se les contactará.</p>
+    <div class="vrow" style="gap:12px;margin-bottom:8px">
+      <select id="fp_vac" aria-label="Filtrar por vacante" style="flex:1;min-width:180px"><option value="todas">Todas las vacantes</option>${vacs.map(v => `<option value="${esc(v)}" ${filtroPostVac === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>
+      <select id="fp_est" aria-label="Filtrar por estado" style="flex:1;min-width:140px"><option value="todos">Todos</option><option ${filtroPostEst === "Apto" ? "selected" : ""}>Apto</option><option ${filtroPostEst === "En revisión" ? "selected" : ""}>En revisión</option></select>
+      <button class="btn small" data-a="refrescar">Actualizar</button>
+    </div>
+    ${cuerpo}`;
+}
+
 function render(){
-  $app.innerHTML = editando ? vForm() : vLista();
+  $app.innerHTML = editando ? vForm() : (verPost ? vPostulantes() : vLista());
 }
 
 const val = id => (document.getElementById(id) || {}).value || "";
@@ -240,6 +284,11 @@ function idNuevo(nombre){
 
 function guardarClave(c){ clave = c; try{ sessionStorage.setItem("clave_admin", c); }catch(e){} }
 
+$app.addEventListener("change", e => {
+  if(e.target.id === "fp_vac"){ filtroPostVac = e.target.value; render(); }
+  if(e.target.id === "fp_est"){ filtroPostEst = e.target.value; render(); }
+});
+
 $app.addEventListener("input", e => {
   if(e.target.id === "clave" || e.target.id === "f_clave2") guardarClave(e.target.value);
 });
@@ -250,6 +299,11 @@ $app.addEventListener("click", async e => {
   if(a === "nueva"){ editando = vacio(); mensaje = null; render(); window.scrollTo({ top: 0 }); }
   else if(a === "editar"){ editando = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id)); mensaje = null; render(); window.scrollTo({ top: 0 }); }
   else if(a === "cancelar"){ editando = null; mensaje = null; render(); }
+  else if(a === "postulantes" || a === "refrescar"){
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador para ver los postulantes." }; return render(); }
+    mensaje = null; verPost = true; cargarPostulantes();
+  }
+  else if(a === "volver-lista"){ verPost = false; render(); }
   else if(a === "toggle"){
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
     const v = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id));
