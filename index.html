@@ -219,7 +219,7 @@ function normalizar(v){
   return {
     id: String(v.id), estado: String(v.estado || "Activa"),
     nombreRaw: String(v.nombre || ""), nombre: esc(v.nombre), descripcion: esc(v.descripcion),
-    sedes: lst(v.sedes), salario: esc(v.salario), beneficios: lst(v.beneficios),
+    sedes: lst(v.sedes), responsabilidades: lst(v.responsabilidades), salario: esc(v.salario), beneficios: lst(v.beneficios),
     horario: esc(v.horario), modalidad: esc(v.modalidad), etapas: lst(v.etapas),
     tiempos: esc(v.tiempos), requisitos: lst(v.requisitos),
     palabrasClave: arr(v.palabrasClave).map(k => norm(String(k))),
@@ -242,6 +242,7 @@ const CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentC
 const BACK = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l-6 6 6 6"/></svg>';
 
 const TEMAS = {
+  responsabilidades: { titulo: "Responsabilidades" },
   salario:    { titulo: "Salario" },
   beneficios: { titulo: "Beneficios" },
   ubicacion:  { titulo: "Ubicación" },
@@ -251,6 +252,7 @@ const TEMAS = {
   etapas:     { titulo: "Proceso de selección" }
 };
 const hasTema = (id, v) => ({
+  responsabilidades: arr(v.responsabilidades).length > 0,
   salario: !!v.salario,
   beneficios: arr(v.beneficios).length > 0,
   ubicacion: arr(v.sedes).length > 0,
@@ -268,6 +270,7 @@ const item = (dt, dd) => dd ? `<div class="item"><dt>${dt}</dt><dd>${dd}</dd></d
 
 function temaContenido(id, v){
   switch(id){
+    case "responsabilidades": return ul(v.responsabilidades);
     case "salario":    return `<p style="font-size:20px;font-weight:600;margin:0">${v.salario}</p>`;
     case "beneficios": return ul(v.beneficios);
     case "ubicacion":  return ul(v.sedes);
