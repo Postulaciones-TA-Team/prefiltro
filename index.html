@@ -184,13 +184,15 @@
   <main id="app" aria-live="polite"></main>
 </div>
 
+<script src="config.js"></script>
 <script>
 /* ============================================================
    CONFIGURACIÓN: edita aquí
    ============================================================ */
-const AGENDA_LINK = "";   // Pega aquí el link de agendamiento de entrevistas
-const ENDPOINT = "https://script.google.com/macros/s/AKfycbzFhWEUzjusg7Hp291X9jD2TB_9XJ_HyIpdIdfpbuW4iMtAAxVY3FQ-xzd6njVQ4zBk/exec";      // Pega aquí la URL de tu Google Apps Script (termina en /exec)
-const AVISO_URL = "";     // Opcional: link a tu política de tratamiento de datos
+const CFG = window.CONFIG || {};       // Se edita en config.js
+const AGENDA_LINK = CFG.AGENDA_LINK || "";
+const ENDPOINT = CFG.ENDPOINT || "";
+const AVISO_URL = CFG.AVISO_URL || "";
 const CONTACTO_TEXTO = "Un integrante del equipo de reclutamiento te atenderá. Escríbenos por el mismo canal por el que te contactamos.";
 
 /* Las vacantes se cargan desde tu hoja de Google (se administran en admin.html).
@@ -199,7 +201,10 @@ let VACANTES = [];
 let carga = { estado: ENDPOINT ? "cargando" : "listo" };
 
 const NIVELES_INGLES = ["A1 a B1", "B2", "B2+", "C1", "Nativo"];
-const INGLES_OK = ["B2+", "C1", "Nativo"];
+const NIVELES_REQ = ["ninguno", "B2", "B2+", "C1", "Nativo"];
+const nivelIdx = n => NIVELES_INGLES.indexOf(n);
+const inglesOk = (v, nivel) => v.inglesMin === "ninguno" || nivelIdx(nivel) >= nivelIdx(v.inglesMin);
+const nPreg = v => v.inglesMin === "ninguno" ? 3 : 4;
 const MIN_CARACTERES = 25;
 
 /* ============================================================ */
@@ -218,6 +223,7 @@ function normalizar(v){
     horario: esc(v.horario), modalidad: esc(v.modalidad), etapas: lst(v.etapas),
     tiempos: esc(v.tiempos), requisitos: lst(v.requisitos),
     palabrasClave: arr(v.palabrasClave).map(k => norm(String(k))),
+    inglesMin: NIVELES_REQ.includes(v.inglesMin) ? v.inglesMin : "B2+",
     linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : ""
   };
 }
@@ -312,7 +318,7 @@ function vVac(){
     ${temas.length ? `<h2 style="margin-top:28px">Conoce más</h2>
       <div class="topics">${temas.map(t => `<button class="topic" data-a="chip" data-id="${t}" aria-pressed="false">${TEMAS[t].titulo}</button>`).join("")}</div>
       <div class="topic-panel" id="topicPanel" hidden aria-live="polite"></div>` : ""}
-    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>Si tu respuesta es sí, te haremos 4 preguntas rápidas para saber si puedes agendar entrevista.</p>
+    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>Si tu respuesta es sí, te haremos ${nPreg(v)} preguntas rápidas para saber si puedes agendar entrevista.</p>
       <div class="actions" style="margin-top:16px">
         <button class="btn solid" data-a="filtro">Sí, me interesa</button>
         <button class="btn" data-a="no-interes">No por ahora</button>
@@ -330,7 +336,7 @@ function vConsent(){
   const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
   return `<div class="swap">${back("vac-page","Volver a la vacante")}
     <h1 tabindex="-1">Antes de empezar</h1>
-    <p class="lead">Para evaluar tu perfil vamos a guardar las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes y nivel de inglés.</p>
+    <p class="lead">Para evaluar tu perfil vamos a guardar las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : " y nivel de inglés"}.</p>
     <div class="sheet" style="padding:20px">
       <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. No te pedimos nombre ni datos de contacto en esta página.</p>
       <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
@@ -344,8 +350,9 @@ function vConsent(){
 }
 
 function progress(){
-  return `<div class="progress" aria-hidden="true">${[0,1,2,3].map(i => `<i class="${i <= state.step ? "on" : ""}"></i>`).join("")}</div>
-          <p class="stepno">Pregunta ${state.step + 1} de 4</p>`;
+  const n = nPreg(vacById(state.vacId));
+  return `<div class="progress" aria-hidden="true">${Array.from({ length: n }, (_, i) => i).map(i => `<i class="${i <= state.step ? "on" : ""}"></i>`).join("")}</div>
+          <p class="stepno">Pregunta ${state.step + 1} de ${n}</p>`;
 }
 
 function vPregunta(){
@@ -381,7 +388,7 @@ function evaluarCodigos(){
   if(!relacionada) f.push("exp");
   if(a.full !== "Sí") f.push("full");
   if(a.viaje !== "No") f.push("viaje");
-  if(!INGLES_OK.includes(a.ingles)) f.push("ingles");
+  if(!inglesOk(v, a.ingles)) f.push("ingles");
   return f;
 }
 const MOTIVOS = {
@@ -392,7 +399,8 @@ const MOTIVOS = {
 };
 
 function vResultado(){
-  const razones = evaluarCodigos().map(k => MOTIVOS[k]);
+  const vr = vacById(state.vacId);
+  const razones = evaluarCodigos().map(k => k === "ingles" ? `Esta vacante requiere un nivel de inglés ${vr.inglesMin} o superior.` : MOTIVOS[k]);
   if(!razones.length){
     const v0 = vacById(state.vacId);
     const enlace = (v0 && v0.linkAgenda) || AGENDA_LINK;
@@ -463,10 +471,10 @@ $app.addEventListener("click", e => {
   }
   else if(act === "ans"){
     state.ans[el.dataset.k] = el.dataset.v;
-    if(state.step < 3){ state.step += 1; render(); } else {
+    if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else {
       const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
       state.view = "resultado"; render();
-      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles });
+      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica" });
     }
   }
 });
