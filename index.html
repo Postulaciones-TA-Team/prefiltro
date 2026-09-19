@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prefiltro de candidatos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF2F7; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#4E5D72; --line:#D3DAE5;
+    --accent:#1F4FFF; --accent-ink:#FFFFFF; --accent-soft:#E3EAFF;
+    --ok:#0F7B55; --ok-soft:#DDF3EA; --warn:#7A5000; --warn-soft:#FFF0CC;
+    --display:"Bricolage Grotesque","Trebuchet MS","Segoe UI",sans-serif;
+    --body:"Public Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+      --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
+      --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+    --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
+    --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--body); font-size:16px; line-height:1.55;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:20px 20px 64px}
+  .brand{
+    display:flex; align-items:center; gap:10px; padding:6px 0 28px;
+    font-family:var(--display); font-weight:700; font-size:17px; letter-spacing:.01em;
+  }
+  .brand-mark{
+    width:28px; height:28px; border-radius:8px; background:var(--accent); color:var(--accent-ink);
+    display:grid; place-items:center; font-size:15px; font-weight:700;
+  }
+  .brand small{font-family:var(--body); font-weight:500; color:var(--muted); font-size:14px}
+
+  h1{
+    font-family:var(--display); font-weight:700; font-size:clamp(30px,7vw,44px);
+    line-height:1.08; letter-spacing:-.02em; margin:0 0 12px;
+  }
+  h1:focus{outline:none}
+  h2{font-family:var(--display); font-weight:700; font-size:20px; line-height:1.2; margin:0 0 8px}
+  .lead{color:var(--muted); font-size:17px; max-width:52ch; margin:0 0 28px}
+  p{margin:0 0 12px}
+
+  /* Menú */
+  .menu{list-style:none; margin:0; padding:0}
+  .menu li{border-top:1px solid var(--line)}
+  .menu li:last-child{border-bottom:1px solid var(--line)}
+  .row{
+    width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px;
+    background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer;
+    padding:16px 4px; min-height:64px;
+  }
+  .row:hover .row-title{color:var(--accent)}
+  .row-title{font-weight:600; display:block}
+  .row-hint{color:var(--muted); font-size:14px; display:block}
+  .chev{flex:none; width:20px; height:20px; color:var(--muted)}
+  .primary-row{
+    background:var(--accent); color:var(--accent-ink); border-radius:14px; padding:18px 20px;
+    margin-bottom:22px; border:0;
+  }
+  .primary-row .row-hint{color:inherit; opacity:.85}
+  .primary-row:hover .row-title{color:inherit}
+  .primary-row .chev{color:inherit}
+
+  /* Botones */
+  .btn{
+    font:inherit; font-weight:600; cursor:pointer; border-radius:12px; padding:13px 20px;
+    border:1.5px solid var(--ink); background:transparent; color:var(--ink); min-height:48px;
+  }
+  .btn:hover{background:var(--accent-soft); border-color:var(--accent)}
+  .btn.solid{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+  .btn.solid:hover{filter:brightness(1.08)}
+  .btn[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--ink)}
+  .actions{display:flex; flex-wrap:wrap; gap:12px; margin-top:24px}
+  .linkback{
+    background:none; border:0; padding:6px 0; margin:0 0 20px; font:inherit; font-weight:600;
+    color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  }
+  .linkback:hover{color:var(--accent)}
+  :focus-visible{outline:3px solid var(--accent); outline-offset:3px; border-radius:6px}
+
+  /* Vacantes */
+  .vac{
+    width:100%; text-align:left; font:inherit; color:inherit; cursor:pointer;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px;
+    margin-bottom:14px; display:block;
+  }
+  .vac:hover{border-color:var(--accent)}
+  .vac h2{margin-bottom:6px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .chip{
+    font-size:13px; font-weight:600; padding:4px 10px; border-radius:999px;
+    background:var(--accent-soft); color:var(--ink);
+  }
+
+  /* Ficha */
+  .sheet{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:8px 20px}
+  .sheet dl{margin:0}
+  .item{padding:16px 0; border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:0}
+  .item dt{font-weight:600; color:var(--muted); font-size:14px; margin-bottom:4px}
+  .item dd{margin:0}
+  .plain{margin:0; padding-left:1.1em}
+  .plain li{margin-bottom:4px}
+  .steps{list-style:none; margin:0; padding:0; counter-reset:s}
+  .steps li{
+    counter-increment:s; position:relative; padding:0 0 16px 44px; min-height:32px;
+  }
+  .steps li::before{
+    content:counter(s); position:absolute; left:0; top:0; width:30px; height:30px; border-radius:50%;
+    background:var(--accent); color:var(--accent-ink); display:grid; place-items:center;
+    font-weight:700; font-size:14px;
+  }
+  .steps li::after{
+    content:""; position:absolute; left:14px; top:32px; bottom:2px; width:2px; background:var(--line);
+  }
+  .steps li:last-child{padding-bottom:0}
+  .steps li:last-child::after{display:none}
+
+  .ask{
+    margin-top:24px; padding:20px; border-radius:16px; background:var(--accent-soft);
+  }
+  .ask h2{margin-bottom:4px}
+  .ask p{color:var(--muted); margin:0}
+
+  /* Filtro */
+  .progress{display:flex; gap:6px; margin:0 0 8px}
+  .progress i{flex:1; height:5px; border-radius:3px; background:var(--line)}
+  .progress i.on{background:var(--accent)}
+  .stepno{color:var(--muted); font-size:14px; margin:0 0 20px}
+  textarea{
+    width:100%; min-height:160px; padding:14px; font:inherit; color:var(--ink);
+    background:var(--surface); border:1.5px solid var(--line); border-radius:12px; resize:vertical;
+  }
+  textarea:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
+  .hint{color:var(--muted); font-size:14px; margin-top:8px}
+  .err{color:var(--warn); background:var(--warn-soft); padding:10px 14px; border-radius:10px; margin-top:12px; font-size:15px}
+  .choices{display:grid; gap:12px}
+  .choices.two{grid-template-columns:1fr 1fr}
+  .choices .btn{text-align:center}
+  .note{color:var(--muted); font-size:14px; margin-top:28px}
+
+  /* Resultado */
+  .result{border-radius:18px; padding:24px}
+  .result.ok{background:var(--ok-soft)}
+  .result.later{background:var(--warn-soft)}
+  .result h1{margin-bottom:10px}
+  .result ul{margin:10px 0 0; padding-left:1.1em}
+
+  .role{font-size:18px; line-height:1.65; max-width:60ch; margin:0 0 4px}
+  .topics{display:flex; flex-wrap:wrap; gap:10px; margin-top:4px}
+  .topic{font:inherit; font-weight:600; cursor:pointer; color:var(--ink); background:var(--surface); border:1.5px solid var(--line); border-radius:999px; padding:10px 18px; min-height:44px}
+  .topic:hover{border-color:var(--accent)}
+  .topic[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+  .topic-panel{margin-top:16px; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px 20px}
+  .topic-panel[hidden]{display:none}
+  .topic-panel h2{font-size:16px; color:var(--muted)}
+  @media (prefers-reduced-motion: no-preference){
+    .swap{animation:in .25s ease-out}
+    @keyframes in{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+  }
+  @media (max-width:420px){ .choices.two{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>
+    <span>Reclutamiento</span>
+  </div>
+  <main id="app" aria-live="polite"></main>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN: edita aquí
+   ============================================================ */
+const AGENDA_LINK = "";   // Pega aquí el link de agendamiento de entrevistas
+const ENDPOINT = "";      // Pega aquí la URL de tu Google Apps Script (termina en /exec)
+const AVISO_URL = "";     // Opcional: link a tu política de tratamiento de datos
+const CONTACTO_TEXTO = "Un integrante del equipo de reclutamiento te atenderá. Escríbenos por el mismo canal por el que te contactamos.";
+
+/* Las vacantes se cargan desde tu hoja de Google (se administran en admin.html).
+   Esta lista solo se usa si ENDPOINT está vacío (modo prueba local). */
+let VACANTES = [];
+let carga = { estado: ENDPOINT ? "cargando" : "listo" };
+
+const NIVELES_INGLES = ["A1 a B1", "B2", "B2+", "C1", "Nativo"];
+const INGLES_OK = ["B2+", "C1", "Nativo"];
+const MIN_CARACTERES = 25;
+
+/* ============================================================ */
+const $app = document.getElementById("app");
+const activas = () => VACANTES.filter(v => v.estado === "Activa");
+const vacById = id => VACANTES.find(v => v.id === id);
+const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const arr = x => Array.isArray(x) ? x.filter(Boolean) : [];
+const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function normalizar(v){
+  const lst = x => arr(x).map(esc);
+  return {
+    id: String(v.id), estado: String(v.estado || "Activa"),
+    nombreRaw: String(v.nombre || ""), nombre: esc(v.nombre), descripcion: esc(v.descripcion),
+    sedes: lst(v.sedes), salario: esc(v.salario), beneficios: lst(v.beneficios),
+    horario: esc(v.horario), modalidad: esc(v.modalidad), etapas: lst(v.etapas),
+    tiempos: esc(v.tiempos), requisitos: lst(v.requisitos),
+    palabrasClave: arr(v.palabrasClave).map(k => norm(String(k))),
+    linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : ""
+  };
+}
+async function cargarVacantes(){
+  if(!ENDPOINT){ carga.estado = "listo"; return; }
+  carga.estado = "cargando"; if(state.view === "home") render();
+  try{
+    const r = await fetch(ENDPOINT + "?accion=vacantes&t=" + Date.now());
+    const j = await r.json();
+    VACANTES = (j.vacantes || []).filter(v => v && v.id).map(normalizar);
+    carga.estado = "listo";
+  }catch(e){ carga.estado = "error"; }
+  if(state.view === "home") render();
+}
+const CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg>';
+const BACK = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l-6 6 6 6"/></svg>';
+
+const TEMAS = {
+  salario:    { titulo: "Salario" },
+  beneficios: { titulo: "Beneficios" },
+  ubicacion:  { titulo: "Ubicación" },
+  modalidad:  { titulo: "Modalidad" },
+  horario:    { titulo: "Horario" },
+  requisitos: { titulo: "Requisitos" },
+  etapas:     { titulo: "Proceso de selección" }
+};
+const hasTema = (id, v) => ({
+  salario: !!v.salario,
+  beneficios: arr(v.beneficios).length > 0,
+  ubicacion: arr(v.sedes).length > 0,
+  modalidad: !!v.modalidad,
+  horario: !!v.horario,
+  requisitos: arr(v.requisitos).length > 0,
+  etapas: arr(v.etapas).length > 0 || !!v.tiempos
+}[id]);
+
+let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null }, err: "" };
+
+const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
+const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
+const item = (dt, dd) => dd ? `<div class="item"><dt>${dt}</dt><dd>${dd}</dd></div>` : "";
+
+function temaContenido(id, v){
+  switch(id){
+    case "salario":    return `<p style="font-size:20px;font-weight:600;margin:0">${v.salario}</p>`;
+    case "beneficios": return ul(v.beneficios);
+    case "ubicacion":  return ul(v.sedes);
+    case "modalidad":  return `<p style="margin:0">${v.modalidad}</p>`;
+    case "horario":    return `<p style="margin:0">${v.horario}</p>`;
+    case "requisitos": return ul(v.requisitos);
+    case "etapas":
+      return (arr(v.etapas).length ? `<ol class="steps">${arr(v.etapas).map(e => `<li>${e}</li>`).join("")}</ol>` : "")
+           + (v.tiempos ? `<p style="margin:${arr(v.etapas).length ? "16px" : "0"} 0 0">El proceso toma entre <strong>${v.tiempos}</strong>.</p>` : "");
+  }
+}
+
+/* ---------- Vistas ---------- */
+function vHome(){
+  if(carga.estado === "cargando"){
+    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1><p class="lead">Cargando vacantes…</p></div>`;
+  }
+  if(carga.estado === "error"){
+    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1>
+      <p class="lead">No pudimos cargar las vacantes. Revisa tu conexión e intenta de nuevo.</p>
+      <div class="actions"><button class="btn solid" data-a="reintentar">Reintentar</button></div></div>`;
+  }
+  const a = activas();
+  if(!a.length){
+    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1>
+      <p class="lead">Por ahora no tenemos vacantes abiertas. Vuelve pronto.</p></div>`;
+  }
+  return `<div class="swap">
+    <h1 tabindex="-1">Vacantes disponibles</h1>
+    <p class="lead">Elige una vacante para conocer los detalles y averiguar si tu perfil encaja.</p>
+    ${a.map(v => {
+      const chips = [v.salario, arr(v.sedes).map(x => x.split(" (")[0]).join(", "), v.modalidad ? v.modalidad.split(";")[0] : ""].filter(Boolean);
+      return `<button class="vac" data-a="vac" data-id="${esc(v.id)}">
+        <h2>${v.nombre}</h2>
+        ${v.descripcion ? `<p style="color:var(--muted);margin:0">${v.descripcion.split(". ")[0].replace(/\.$/, "")}.</p>` : ""}
+        ${chips.length ? `<div class="chips">${chips.map(c => `<span class="chip">${c}</span>`).join("")}</div>` : ""}
+      </button>`;
+    }).join("")}
+  </div>`;
+}
+
+function vVac(){
+  const v = vacById(state.vacId);
+  const temas = Object.keys(TEMAS).filter(t => hasTema(t, v));
+  return `<div class="swap">${back("home","Ver otras vacantes")}
+    <h1 tabindex="-1">${v.nombre}</h1>
+    ${v.descripcion ? `<h2>Sobre el rol</h2><p class="role">${v.descripcion}</p>` : ""}
+    ${temas.length ? `<h2 style="margin-top:28px">Conoce más</h2>
+      <div class="topics">${temas.map(t => `<button class="topic" data-a="chip" data-id="${t}" aria-pressed="false">${TEMAS[t].titulo}</button>`).join("")}</div>
+      <div class="topic-panel" id="topicPanel" hidden aria-live="polite"></div>` : ""}
+    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>Si tu respuesta es sí, te haremos 4 preguntas rápidas para saber si puedes agendar entrevista.</p>
+      <div class="actions" style="margin-top:16px">
+        <button class="btn solid" data-a="filtro">Sí, me interesa</button>
+        <button class="btn" data-a="no-interes">No por ahora</button>
+      </div></div>
+  </div>`;
+}
+
+function vNoInteres(){
+  return `<div class="swap"><h1 tabindex="-1">Gracias por tu tiempo</h1>
+    <p class="lead">Cuando quieras retomar, aquí estaremos. Puedes revisar otras vacantes.</p>
+    <div class="actions"><button class="btn solid" data-a="home">Ver otras vacantes</button></div></div>`;
+}
+
+function vConsent(){
+  const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
+  return `<div class="swap">${back("vac-page","Volver a la vacante")}
+    <h1 tabindex="-1">Antes de empezar</h1>
+    <p class="lead">Para evaluar tu perfil vamos a guardar las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes y nivel de inglés.</p>
+    <div class="sheet" style="padding:20px">
+      <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. No te pedimos nombre ni datos de contacto en esta página.</p>
+      <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
+      <label style="display:flex;gap:12px;align-items:flex-start;margin-top:16px;cursor:pointer">
+        <input type="checkbox" id="okDatos" style="width:22px;height:22px;margin-top:2px;accent-color:var(--accent)">
+        <span>Autorizo el tratamiento de mis datos para este proceso de selección.</span>
+      </label>
+    </div>
+    <div class="actions"><button class="btn solid" id="btnAcepto" data-a="acepto" disabled>Acepto y continúo</button>
+      <button class="btn" data-a="no-acepto">No acepto</button></div></div>`;
+}
+
+function progress(){
+  return `<div class="progress" aria-hidden="true">${[0,1,2,3].map(i => `<i class="${i <= state.step ? "on" : ""}"></i>`).join("")}</div>
+          <p class="stepno">Pregunta ${state.step + 1} de 4</p>`;
+}
+
+function vPregunta(){
+  const s = state.step, a = state.ans;
+  const prev = s === 0 ? back("vac-page","Volver a la vacante") : back("prev","Pregunta anterior");
+  const yn = key => `<div class="choices two">
+      <button class="btn" data-a="ans" data-k="${key}" data-v="Sí" aria-pressed="${a[key] === "Sí"}">Sí</button>
+      <button class="btn" data-a="ans" data-k="${key}" data-v="No" aria-pressed="${a[key] === "No"}">No</button></div>`;
+  let body = "";
+  if(s === 0){
+    body = `<h1 tabindex="-1">Cuéntanos sobre tu experiencia relacionada con este rol</h1>
+      <p class="lead" style="margin-bottom:16px">Puedes mencionar cargos, funciones, herramientas o logros.</p>
+      <label for="exp" class="hint" style="display:block;margin:0 0 8px">Tu respuesta</label>
+      <textarea id="exp" maxlength="1200">${a.exp}</textarea>
+      ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
+      <div class="actions"><button class="btn solid" data-a="next">Continuar</button></div>`;
+  } else if(s === 1){
+    body = `<h1 tabindex="-1">¿Tienes disponibilidad de tiempo completo?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("full")}`;
+  } else if(s === 2){
+    body = `<h1 tabindex="-1">¿Tienes algún viaje planeado próximamente?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("viaje")}`;
+  } else {
+    body = `<h1 tabindex="-1">¿Cuál es tu nivel de inglés?</h1><p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>
+      <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
+  }
+  return `<div class="swap">${prev}${progress()}${body}
+    <p class="note">${ENDPOINT ? "Guardamos tus respuestas sin tu nombre ni datos de contacto." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
+}
+
+function evaluarCodigos(){
+  const v = vacById(state.vacId), a = state.ans, f = [];
+  const texto = norm(a.exp), kw = arr(v.palabrasClave);
+  const relacionada = texto.length >= MIN_CARACTERES && (kw.length === 0 || kw.some(k => texto.includes(k)));
+  if(!relacionada) f.push("exp");
+  if(a.full !== "Sí") f.push("full");
+  if(a.viaje !== "No") f.push("viaje");
+  if(!INGLES_OK.includes(a.ingles)) f.push("ingles");
+  return f;
+}
+const MOTIVOS = {
+  exp: "Tu experiencia descrita no parece relacionada con las funciones de esta vacante.",
+  full: "Esta vacante requiere disponibilidad de tiempo completo.",
+  viaje: "Por ahora buscamos personas sin viajes planeados en el corto plazo.",
+  ingles: "Esta vacante requiere un nivel de inglés B2+ o superior."
+};
+
+function vResultado(){
+  const razones = evaluarCodigos().map(k => MOTIVOS[k]);
+  if(!razones.length){
+    const v0 = vacById(state.vacId);
+    const enlace = (v0 && v0.linkAgenda) || AGENDA_LINK;
+    const cta = enlace
+      ? `<div class="actions"><a class="btn solid" href="${enlace}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`
+      : `<p style="margin-top:12px">Muy pronto encontrarás aquí el enlace para agendar tu entrevista.</p>`;
+    return `<div class="swap"><div class="result ok"><h1 tabindex="-1">¡Genial! Tu perfil encaja</h1>
+      <p>Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>${cta}</div>
+      <div class="actions"><button class="btn" data-a="home">Volver al inicio</button></div></div>`;
+  }
+  return `<div class="swap"><div class="result later"><h1 tabindex="-1">Gracias por contarnos sobre ti</h1>
+    <p>Por ahora tu perfil no cumple con lo que pide esta vacante:</p><ul>${razones.map(r => `<li>${r}</li>`).join("")}</ul>
+    <p style="margin-top:14px">Te invitamos a revisar otras vacantes o a volver cuando tu situación cambie.</p></div>
+    <div class="actions"><button class="btn solid" data-a="home">Ver otras vacantes</button></div></div>`;
+}
+
+function enviarResultado(payload){
+  if(!ENDPOINT) return;
+  try{
+    fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }).catch(() => {});
+  }catch(e){}
+}
+
+const VIEWS = { home: vHome, vac: vVac, consent: vConsent, nointeres: vNoInteres, pregunta: vPregunta, resultado: vResultado };
+
+function render(){
+  $app.innerHTML = VIEWS[state.view]();
+  const h1 = $app.querySelector("h1");
+  if(h1){ h1.focus({ preventScroll: true }); }
+  window.scrollTo({ top: 0 });
+  if(state.view === "pregunta" && state.step === 0){
+    const t = document.getElementById("exp");
+    if(t) t.addEventListener("input", e => { state.ans.exp = e.target.value; });
+  }
+}
+
+function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null }; }
+
+$app.addEventListener("click", e => {
+  const el = e.target.closest("[data-a]"); if(!el) return;
+  const act = el.dataset.a;
+  if(act === "home"){ state.view = "home"; render(); }
+  else if(act === "reintentar"){ cargarVacantes(); }
+  else if(act === "vac"){ state.vacId = el.dataset.id; state.tema = null; state.view = "vac"; render(); }
+  else if(act === "vac-page"){ state.view = "vac"; render(); }
+  else if(act === "chip"){
+    const id = el.dataset.id;
+    state.tema = state.tema === id ? null : id;
+    document.querySelectorAll(".topic").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === state.tema)));
+    const panel = document.getElementById("topicPanel");
+    panel.innerHTML = state.tema ? `<h2>${TEMAS[state.tema].titulo}</h2>${temaContenido(state.tema, vacById(state.vacId))}` : "";
+    panel.hidden = !state.tema;
+  }
+  else if(act === "filtro"){ state.view = "consent"; render(); }
+  else if(act === "acepto"){ reiniciarFiltro(); state.view = "pregunta"; render(); }
+  else if(act === "no-acepto"){ state.view = "nointeres"; render(); }
+  else if(act === "no-interes"){
+    const v = vacById(state.vacId);
+    enviarResultado({ tipo: "no_interes", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw });
+    state.view = "nointeres"; render();
+  }
+  else if(act === "prev"){ state.step = Math.max(0, state.step - 1); state.err = ""; render(); }
+  else if(act === "next"){
+    const txt = (document.getElementById("exp") || {}).value || state.ans.exp;
+    state.ans.exp = txt;
+    if(txt.trim().length < MIN_CARACTERES){ state.err = "Cuéntanos un poco más para poder evaluar tu perfil."; return render(); }
+    state.err = ""; state.step = 1; render();
+  }
+  else if(act === "ans"){
+    state.ans[el.dataset.k] = el.dataset.v;
+    if(state.step < 3){ state.step += 1; render(); } else {
+      const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
+      state.view = "resultado"; render();
+      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles });
+    }
+  }
+});
+
+$app.addEventListener("change", e => {
+  if(e.target.id === "okDatos"){ document.getElementById("btnAcepto").disabled = !e.target.checked; }
+});
+
+render();
+cargarVacantes();
+</script>
+</body>
+</html>

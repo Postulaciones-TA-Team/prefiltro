@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Administrar vacantes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEF2F7; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#4E5D72; --line:#D3DAE5;
+    --accent:#1F4FFF; --accent-ink:#FFFFFF; --accent-soft:#E3EAFF;
+    --ok:#0F7B55; --ok-soft:#DDF3EA; --warn:#7A5000; --warn-soft:#FFF0CC;
+    --display:"Bricolage Grotesque","Trebuchet MS","Segoe UI",sans-serif;
+    --body:"Public Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+      --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
+      --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+    --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
+    --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.55}
+  .wrap{max-width:720px; margin:0 auto; padding:20px 20px 64px}
+  h1{font-family:var(--display); font-weight:700; font-size:clamp(28px,6vw,38px); line-height:1.1; letter-spacing:-.02em; margin:8px 0 8px}
+  h1:focus{outline:none}
+  h2{font-family:var(--display); font-weight:700; font-size:19px; margin:0 0 8px}
+  .lead{color:var(--muted); margin:0 0 24px}
+  label{display:block; font-weight:600; font-size:14px; margin:18px 0 6px}
+  .hint{color:var(--muted); font-size:13px; font-weight:400; margin:4px 0 0}
+  input[type=text],input[type=password],textarea,select{
+    width:100%; font:inherit; color:var(--ink); background:var(--surface);
+    border:1.5px solid var(--line); border-radius:10px; padding:11px 12px;
+  }
+  textarea{min-height:88px; resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
+  .btn{font:inherit; font-weight:600; cursor:pointer; border-radius:12px; padding:12px 18px; border:1.5px solid var(--ink); background:transparent; color:var(--ink); min-height:46px}
+  .btn:hover{background:var(--accent-soft); border-color:var(--accent)}
+  .btn.solid{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+  .btn.small{min-height:38px; padding:7px 14px; font-size:14px}
+  .btn[disabled]{opacity:.55; cursor:default}
+  .actions{display:flex; flex-wrap:wrap; gap:12px; margin-top:24px}
+  :focus-visible{outline:3px solid var(--accent); outline-offset:3px; border-radius:6px}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin-bottom:12px}
+  .vrow{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .vrow h2{margin:0}
+  .chip{font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px}
+  .chip.on{background:var(--ok-soft); color:var(--ok)}
+  .chip.off{background:var(--warn-soft); color:var(--warn)}
+  .btns{display:flex; gap:8px; flex-wrap:wrap}
+  .msg{padding:12px 16px; border-radius:12px; margin:16px 0; font-size:15px}
+  .msg.ok{background:var(--ok-soft); color:var(--ok)}
+  .msg.err{background:var(--warn-soft); color:var(--warn)}
+  .msg.info{background:var(--accent-soft)}
+  .linkback{background:none; border:0; padding:6px 0; font:inherit; font-weight:600; color:var(--muted); cursor:pointer}
+  .linkback:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <main id="app"></main>
+</div>
+
+<script>
+/* Pega aquí la misma URL del Apps Script (termina en /exec) que usaste en index.html */
+const ENDPOINT = "";
+
+const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
+let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
+try{ clave = sessionStorage.getItem("clave_admin") || ""; }catch(e){}
+
+const $app = document.getElementById("app");
+const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const quitaTildes = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const slug = s => quitaTildes(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "vacante";
+
+async function traer(){
+  const r = await fetch(ENDPOINT + "?accion=vacantes&t=" + Date.now());
+  const j = await r.json();
+  return j.vacantes || [];
+}
+
+async function cargar(){
+  if(!ENDPOINT){ cargando = false; return render(); }
+  cargando = true; render();
+  try{ lista = await traer(); mensaje = null; }
+  catch(e){ mensaje = { t: "err", x: "No se pudieron cargar las vacantes. Revisa la URL del script y que esté publicado para «Cualquier persona»." }; }
+  cargando = false; render();
+}
+
+/* Envía la vacante y confirma leyendo la hoja de nuevo. */
+async function guardarVacante(v){
+  guardando = true; mensaje = { t: "info", x: "Guardando…" }; render();
+  try{
+    await fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ tipo: "vacante_guardar", clave, vacante: v }) });
+    for(let i = 0; i < 5; i++){
+      await sleep(1500);
+      const nueva = await traer();
+      const g = nueva.find(x => x.id === v.id);
+      if(g && g.nombre === v.nombre && g.estado === v.estado && g.descripcion === v.descripcion && g.salario === v.salario){
+        lista = nueva; guardando = false; return true;
+      }
+    }
+  }catch(e){}
+  guardando = false; return false;
+}
+
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "" });
+
+function vLista(){
+  if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en la constante ENDPOINT al inicio del código de admin.html.</div>`;
+  const filas = lista.length ? lista.map(v => `<div class="card"><div class="vrow">
+      <div><h2>${esc(v.nombre)}</h2><span class="chip ${v.estado === "Activa" ? "on" : "off"}">${esc(v.estado)}</span></div>
+      <div class="btns">
+        <button class="btn small" data-a="editar" data-id="${esc(v.id)}">Editar</button>
+        <button class="btn small" data-a="toggle" data-id="${esc(v.id)}">${v.estado === "Activa" ? "Cerrar" : "Reabrir"}</button>
+      </div></div></div>`).join("")
+    : (cargando ? `<p class="lead">Cargando…</p>` : `<div class="card"><p style="margin:0;color:var(--muted)">Todavía no hay vacantes. Crea la primera.</p></div>`);
+  return `<h1 tabindex="-1">Administrar vacantes</h1>
+    <p class="lead">Crea, edita y cierra las vacantes que ven los candidatos. Los cambios se reflejan al instante en la página pública.</p>
+    <label for="clave">Clave de administrador</label>
+    <input type="password" id="clave" value="${esc(clave)}" autocomplete="off">
+    <p class="hint">La clave es la que pusiste en CLAVE_ADMIN dentro del Apps Script.</p>
+    ${mensaje ? `<div class="msg ${mensaje.t}" role="status">${esc(mensaje.x)}</div>` : ""}
+    <div class="actions" style="margin:20px 0"><button class="btn solid" data-a="nueva">Nueva vacante</button></div>
+    ${filas}`;
+}
+
+function campoLista(id, label, valor, hint){
+  return `<label for="${id}">${label}</label><textarea id="${id}">${esc((valor || []).join("\n"))}</textarea>${hint ? `<p class="hint">${hint}</p>` : ""}`;
+}
+
+function vForm(){
+  const v = editando;
+  return `<button class="linkback" data-a="cancelar">← Volver a la lista</button>
+    <h1 tabindex="-1">${v.id ? "Editar vacante" : "Nueva vacante"}</h1>
+    <label for="f_nombre">Nombre de la vacante *</label>
+    <input type="text" id="f_nombre" value="${esc(v.nombre)}">
+    <label for="f_estado">Estado</label>
+    <select id="f_estado"><option ${v.estado === "Activa" ? "selected" : ""}>Activa</option><option ${v.estado === "Cerrada" ? "selected" : ""}>Cerrada</option></select>
+    <p class="hint">Solo las vacantes «Activa» las ven los candidatos.</p>
+    <label for="f_descripcion">Descripción corta</label>
+    <textarea id="f_descripcion">${esc(v.descripcion)}</textarea>
+    ${campoLista("f_sedes", "Sedes / ciudades", v.sedes, "Una por línea. Ej: Medellín (Edificio Camacol)")}
+    <label for="f_salario">Salario</label>
+    <input type="text" id="f_salario" value="${esc(v.salario)}" placeholder="$7.000.000 COP">
+    ${campoLista("f_beneficios", "Beneficios", v.beneficios, "Uno por línea.")}
+    <label for="f_horario">Horario</label>
+    <input type="text" id="f_horario" value="${esc(v.horario)}" placeholder="Lunes a viernes, 8:00 a.m. a 6:00 p.m.">
+    <label for="f_modalidad">Modalidad</label>
+    <input type="text" id="f_modalidad" value="${esc(v.modalidad)}" placeholder="Presencial, híbrida o remota">
+    ${campoLista("f_etapas", "Etapas del proceso", v.etapas, "Una por línea, en orden.")}
+    <label for="f_tiempos">Tiempos estimados</label>
+    <input type="text" id="f_tiempos" value="${esc(v.tiempos)}" placeholder="1 a 2 semanas">
+    ${campoLista("f_requisitos", "Requisitos", v.requisitos, "Uno por línea.")}
+    <label for="f_palabrasClave">Palabras clave de experiencia</label>
+    <input type="text" id="f_palabrasClave" value="${esc((v.palabrasClave || []).join(", "))}" placeholder="bpo, clientes, kpis, supervisores">
+    <p class="hint">Separadas por coma. El prefiltro las busca en la respuesta de experiencia del candidato. Si las dejas vacías, solo revisa que la respuesta tenga suficiente texto.</p>
+    <label for="f_linkAgenda">Link de agendamiento (opcional)</label>
+    <input type="text" id="f_linkAgenda" value="${esc(v.linkAgenda)}" placeholder="https://...">
+    <p class="hint">Si lo dejas vacío, se usa el link general de index.html. Debe empezar con https://</p>
+    <label for="f_clave2">Clave de administrador</label>
+    <input type="password" id="f_clave2" value="${esc(clave)}" autocomplete="off">
+    ${mensaje ? `<div class="msg ${mensaje.t}" role="status">${esc(mensaje.x)}</div>` : ""}
+    <div class="actions"><button class="btn solid" data-a="guardar" ${guardando ? "disabled" : ""}>Guardar vacante</button>
+      <button class="btn" data-a="cancelar">Cancelar</button></div>`;
+}
+
+function render(){
+  $app.innerHTML = editando ? vForm() : vLista();
+}
+
+const val = id => (document.getElementById(id) || {}).value || "";
+const lineas = id => val(id).split("\n").map(x => x.trim()).filter(Boolean);
+
+function leerForm(){
+  const v = Object.assign({}, editando);
+  v.nombre = val("f_nombre").trim();
+  v.estado = val("f_estado") === "Cerrada" ? "Cerrada" : "Activa";
+  v.descripcion = val("f_descripcion").trim();
+  v.sedes = lineas("f_sedes");
+  v.salario = val("f_salario").trim();
+  v.beneficios = lineas("f_beneficios");
+  v.horario = val("f_horario").trim();
+  v.modalidad = val("f_modalidad").trim();
+  v.etapas = lineas("f_etapas");
+  v.tiempos = val("f_tiempos").trim();
+  v.requisitos = lineas("f_requisitos");
+  v.palabrasClave = val("f_palabrasClave").split(",").map(x => quitaTildes(x.trim().toLowerCase())).filter(Boolean);
+  v.linkAgenda = val("f_linkAgenda").trim();
+  return v;
+}
+
+function idNuevo(nombre){
+  const base = slug(nombre); let id = base, n = 2;
+  while(lista.some(x => x.id === id)){ id = base + "-" + n++; }
+  return id;
+}
+
+function guardarClave(c){ clave = c; try{ sessionStorage.setItem("clave_admin", c); }catch(e){} }
+
+$app.addEventListener("input", e => {
+  if(e.target.id === "clave" || e.target.id === "f_clave2") guardarClave(e.target.value);
+});
+
+$app.addEventListener("click", async e => {
+  const el = e.target.closest("[data-a]"); if(!el) return;
+  const a = el.dataset.a;
+  if(a === "nueva"){ editando = vacio(); mensaje = null; render(); window.scrollTo({ top: 0 }); }
+  else if(a === "editar"){ editando = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id)); mensaje = null; render(); window.scrollTo({ top: 0 }); }
+  else if(a === "cancelar"){ editando = null; mensaje = null; render(); }
+  else if(a === "toggle"){
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
+    const v = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id));
+    v.estado = v.estado === "Activa" ? "Cerrada" : "Activa";
+    const ok = await guardarVacante(v);
+    mensaje = ok ? { t: "ok", x: v.estado === "Activa" ? "Vacante reabierta." : "Vacante cerrada." }
+                 : { t: "err", x: "No se pudo confirmar el cambio. Revisa la clave e intenta de nuevo." };
+    render();
+  }
+  else if(a === "guardar"){
+    const v = leerForm();
+    if(!v.nombre){ mensaje = { t: "err", x: "Escribe el nombre de la vacante." }; return render(); }
+    if(v.linkAgenda && !/^https:\/\//i.test(v.linkAgenda)){ mensaje = { t: "err", x: "El link de agendamiento debe empezar con https://" }; return render(); }
+    const c = val("f_clave2"); if(c) guardarClave(c);
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
+    if(!v.id) v.id = idNuevo(v.nombre);
+    editando = v;
+    const ok = await guardarVacante(v);
+    if(ok){ editando = null; mensaje = { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." }; }
+    else { mensaje = { t: "err", x: "No se pudo confirmar el guardado. Revisa la clave de administrador y que el script esté publicado; luego intenta de nuevo." }; }
+    render();
+  }
+});
+
+render();
+cargar();
+</script>
+</body>
+</html>
