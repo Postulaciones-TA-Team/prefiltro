@@ -147,6 +147,9 @@
   }
   textarea:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
   .hint{color:var(--muted); font-size:14px; margin-top:8px}
+  .fld{display:block; font-weight:600; font-size:14px; margin:18px 0 6px}
+  .inp{width:100%; font:inherit; color:var(--ink); background:var(--surface); border:1.5px solid var(--line); border-radius:10px; padding:12px}
+  .inp:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
   .err{color:var(--warn); background:var(--warn-soft); padding:10px 14px; border-radius:10px; margin-top:12px; font-size:15px}
   .choices{display:grid; gap:12px}
   .choices.two{grid-template-columns:1fr 1fr}
@@ -262,7 +265,7 @@ const hasTema = (id, v) => ({
   etapas: arr(v.etapas).length > 0 || !!v.tiempos
 }[id]);
 
-let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null }, err: "" };
+let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null }, datos: { nombre: "", correo: "" }, err: "" };
 
 const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
 const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
@@ -302,7 +305,7 @@ function vHome(){
     <h1 tabindex="-1">Vacantes disponibles</h1>
     <p class="lead">Elige una vacante para conocer los detalles y averiguar si tu perfil encaja.</p>
     ${a.map(v => {
-      const chips = [v.salario, arr(v.sedes).map(x => x.split(" (")[0]).join(", "), v.modalidad ? v.modalidad.split(";")[0] : ""].filter(Boolean);
+      const chips = [arr(v.sedes).map(x => x.split(" (")[0]).join(", "), v.modalidad ? v.modalidad.split(";")[0] : ""].filter(Boolean);
       return `<button class="vac" data-a="vac" data-id="${esc(v.id)}">
         <h2>${v.nombre}</h2>
         ${v.descripcion ? `<p style="color:var(--muted);margin:0">${v.descripcion.split(". ")[0].replace(/\.$/, "")}.</p>` : ""}
@@ -339,9 +342,9 @@ function vConsent(){
   const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
   return `<div class="swap">${back("vac-page","Volver a la vacante")}
     <h1 tabindex="-1">Antes de empezar</h1>
-    <p class="lead">Para evaluar tu perfil vamos a guardar las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : " y nivel de inglés"}.</p>
+    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : " y nivel de inglés"}.</p>
     <div class="sheet" style="padding:20px">
-      <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. No te pedimos nombre ni datos de contacto en esta página.</p>
+      <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. Solo el equipo de reclutamiento puede consultarla.</p>
       <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
       <label style="display:flex;gap:12px;align-items:flex-start;margin-top:16px;cursor:pointer">
         <input type="checkbox" id="okDatos" style="width:22px;height:22px;margin-top:2px;accent-color:var(--accent)">
@@ -350,6 +353,19 @@ function vConsent(){
     </div>
     <div class="actions"><button class="btn solid" id="btnAcepto" data-a="acepto" disabled>Acepto y continúo</button>
       <button class="btn" data-a="no-acepto">No acepto</button></div></div>`;
+}
+
+function vDatos(){
+  const d = state.datos;
+  return `<div class="swap">${back("filtro","Volver")}
+    <h1 tabindex="-1">Tus datos de contacto</h1>
+    <p class="lead">Así podremos comunicarnos contigo sobre tu postulación.</p>
+    <label class="fld" for="nombre">Nombre completo</label>
+    <input class="inp" type="text" id="nombre" autocomplete="name" value="${esc(d.nombre)}">
+    <label class="fld" for="correo">Correo electrónico</label>
+    <input class="inp" type="email" id="correo" autocomplete="email" inputmode="email" value="${esc(d.correo)}">
+    ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
+    <div class="actions"><button class="btn solid" data-a="datos-ok">Continuar</button></div></div>`;
 }
 
 function progress(){
@@ -381,7 +397,7 @@ function vPregunta(){
       <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
   }
   return `<div class="swap">${prev}${progress()}${body}
-    <p class="note">${ENDPOINT ? "Guardamos tus respuestas sin tu nombre ni datos de contacto." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
+    <p class="note">${ENDPOINT ? "Guardamos tus respuestas junto con tu nombre y correo para el proceso de selección." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
 }
 
 function evaluarCodigos(){
@@ -402,21 +418,19 @@ const MOTIVOS = {
 };
 
 function vResultado(){
-  const vr = vacById(state.vacId);
-  const razones = evaluarCodigos().map(k => k === "ingles" ? `Esta vacante requiere un nivel de inglés ${vr.inglesMin} o superior.` : MOTIVOS[k]);
-  if(!razones.length){
+  const apto = evaluarCodigos().length === 0;
+  if(apto){
     const v0 = vacById(state.vacId);
     const enlace = (v0 && v0.linkAgenda) || AGENDA_LINK;
     const cta = enlace
       ? `<div class="actions"><a class="btn solid" href="${enlace}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`
       : `<p style="margin-top:12px">Muy pronto encontrarás aquí el enlace para agendar tu entrevista.</p>`;
     return `<div class="swap"><div class="result ok"><h1 tabindex="-1">¡Genial! Tu perfil encaja</h1>
-      <p>Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>${cta}</div>
+      <p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>${cta}</div>
       <div class="actions"><button class="btn" data-a="home">Volver al inicio</button></div></div>`;
   }
-  return `<div class="swap"><div class="result later"><h1 tabindex="-1">Gracias por contarnos sobre ti</h1>
-    <p>Por ahora tu perfil no cumple con lo que pide esta vacante:</p><ul>${razones.map(r => `<li>${r}</li>`).join("")}</ul>
-    <p style="margin-top:14px">Te invitamos a revisar otras vacantes o a volver cuando tu situación cambie.</p></div>
+  return `<div class="swap"><div class="result later"><h1 tabindex="-1">Gracias por postularte</h1>
+    <p>Recibimos tu información. Revisaremos tu perfil y nos pondremos en contacto contigo.</p></div>
     <div class="actions"><button class="btn solid" data-a="home">Ver otras vacantes</button></div></div>`;
 }
 
@@ -427,7 +441,7 @@ function enviarResultado(payload){
   }catch(e){}
 }
 
-const VIEWS = { home: vHome, vac: vVac, consent: vConsent, nointeres: vNoInteres, pregunta: vPregunta, resultado: vResultado };
+const VIEWS = { home: vHome, vac: vVac, consent: vConsent, datos: vDatos, nointeres: vNoInteres, pregunta: vPregunta, resultado: vResultado };
 
 function render(){
   $app.innerHTML = VIEWS[state.view]();
@@ -440,7 +454,7 @@ function render(){
   }
 }
 
-function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null }; }
+function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null }; state.datos = { nombre: "", correo: "" }; }
 
 $app.addEventListener("click", e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
@@ -458,7 +472,13 @@ $app.addEventListener("click", e => {
     panel.hidden = !state.tema;
   }
   else if(act === "filtro"){ state.view = "consent"; render(); }
-  else if(act === "acepto"){ reiniciarFiltro(); state.view = "pregunta"; render(); }
+  else if(act === "acepto"){ reiniciarFiltro(); state.view = "datos"; render(); }
+  else if(act === "datos-ok"){
+    const n = state.datos.nombre.trim(), c = state.datos.correo.trim();
+    if(n.length < 3){ state.err = "Escribe tu nombre completo."; return render(); }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c)){ state.err = "Escribe un correo válido, por ejemplo nombre@correo.com."; return render(); }
+    state.err = ""; state.step = 0; state.view = "pregunta"; render();
+  }
   else if(act === "no-acepto"){ state.view = "nointeres"; render(); }
   else if(act === "no-interes"){
     const v = vacById(state.vacId);
@@ -477,9 +497,14 @@ $app.addEventListener("click", e => {
     if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else {
       const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
       state.view = "resultado"; render();
-      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica" });
+      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim() });
     }
   }
+});
+
+$app.addEventListener("input", e => {
+  if(e.target.id === "nombre") state.datos.nombre = e.target.value;
+  if(e.target.id === "correo") state.datos.correo = e.target.value;
 });
 
 $app.addEventListener("change", e => {
