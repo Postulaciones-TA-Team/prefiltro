@@ -70,9 +70,10 @@
   <main id="app"></main>
 </div>
 
+<script src="config.js"></script>
 <script>
-/* Pega aquí la misma URL del Apps Script (termina en /exec) que usaste en index.html */
-const ENDPOINT = "https://script.google.com/macros/s/AKfycbzFhWEUzjusg7Hp291X9jD2TB_9XJ_HyIpdIdfpbuW4iMtAAxVY3FQ-xzd6njVQ4zBk/exec";
+/* La URL del Apps Script se configura en config.js */
+const ENDPOINT = (window.CONFIG || {}).ENDPOINT || "";
 
 const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
 let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
@@ -137,10 +138,10 @@ async function guardarVacante(v){
   return { ok: false, razon: "El script no confirmó el guardado. Revisa la pestaña «Vacantes» de tu hoja: si la fila está, sí se guardó y basta con recargar esta página." };
 }
 
-const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "" });
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+" });
 
 function vLista(){
-  if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en la constante ENDPOINT al inicio del código de admin.html.</div>`;
+  if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en el archivo config.js.</div>`;
   const filas = lista.length ? lista.map(v => `<div class="card"><div class="vrow">
       <div><h2>${esc(v.nombre)}</h2><span class="chip ${v.estado === "Activa" ? "on" : "off"}">${esc(v.estado)}</span></div>
       <div class="btns">
@@ -188,6 +189,11 @@ function vForm(){
     <label for="f_palabrasClave">Palabras clave de experiencia</label>
     <input type="text" id="f_palabrasClave" value="${esc((v.palabrasClave || []).join(", "))}" placeholder="bpo, clientes, kpis, supervisores">
     <p class="hint">Separadas por coma. El prefiltro las busca en la respuesta de experiencia del candidato. Si las dejas vacías, solo revisa que la respuesta tenga suficiente texto.</p>
+    <label for="f_inglesMin">Nivel de inglés requerido</label>
+    <select id="f_inglesMin">
+      ${[["ninguno","No se requiere inglés"],["B2","B2 o superior"],["B2+","B2+ o superior"],["C1","C1 o superior"],["Nativo","Nativo"]].map(([k,t]) => `<option value="${k}" ${(v.inglesMin || "B2+") === k ? "selected" : ""}>${t}</option>`).join("")}
+    </select>
+    <p class="hint">Si eliges «No se requiere inglés», el prefiltro no le hace esa pregunta al candidato.</p>
     <label for="f_linkAgenda">Link de agendamiento (opcional)</label>
     <input type="text" id="f_linkAgenda" value="${esc(v.linkAgenda)}" placeholder="https://...">
     <p class="hint">Si lo dejas vacío, se usa el link general de index.html. Debe empezar con https://</p>
@@ -219,6 +225,7 @@ function leerForm(){
   v.tiempos = val("f_tiempos").trim();
   v.requisitos = lineas("f_requisitos");
   v.palabrasClave = val("f_palabrasClave").split(",").map(x => quitaTildes(x.trim().toLowerCase())).filter(Boolean);
+  v.inglesMin = val("f_inglesMin") || "B2+";
   v.linkAgenda = val("f_linkAgenda").trim();
   return v;
 }
