@@ -72,7 +72,7 @@
 
 <script>
 /* Pega aquí la misma URL del Apps Script (termina en /exec) que usaste en index.html */
-const ENDPOINT = "https://script.google.com/macros/s/AKfycbzFhWEUzjusg7Hp291X9jD2TB_9XJ_HyIpdIdfpbuW4iMtAAxVY3FQ-xzd6njVQ4zBk/exec";
+const ENDPOINT = "";
 
 const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
 let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
@@ -98,22 +98,43 @@ async function cargar(){
   cargando = false; render();
 }
 
-/* Envía la vacante y confirma leyendo la hoja de nuevo. */
+/* Envía la vacante. Primero intenta leer la respuesta del script para saber el motivo exacto;
+   si el navegador no lo permite, envía igual y confirma leyendo la hoja. */
+async function enviar(v){
+  const cuerpo = JSON.stringify({ tipo: "vacante_guardar", clave, vacante: v });
+  const cab = { "Content-Type": "text/plain;charset=utf-8" };
+  try{
+    const r = await fetch(ENDPOINT, { method: "POST", headers: cab, body: cuerpo });
+    return await r.json();
+  }catch(e){}
+  try{ await fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: cab, body: cuerpo }); }catch(e){}
+  return null;
+}
+
+const MOTIVOS = {
+  clave: "La clave no coincide con la que pusiste en el script (CLAVE_ADMIN). Revisa mayúsculas y espacios.",
+  clave_por_defecto: "En el script todavía está la clave de ejemplo («cambia-esta-clave»). Cámbiala, guarda y publica una versión nueva (Implementar > Administrar implementaciones > lápiz > Versión: Nueva versión).",
+  id: "La vacante no tiene identificador. Escribe un nombre e intenta de nuevo."
+};
+
 async function guardarVacante(v){
   guardando = true; mensaje = { t: "info", x: "Guardando…" }; render();
+  const j = await enviar(v);
+  if(j && j.ok === false){
+    guardando = false;
+    return { ok: false, razon: MOTIVOS[j.error] || ("El script rechazó el guardado (" + j.error + ").") };
+  }
   try{
-    await fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ tipo: "vacante_guardar", clave, vacante: v }) });
     for(let i = 0; i < 5; i++){
-      await sleep(1500);
+      await sleep(j && j.ok ? 500 : 1500);
       const nueva = await traer();
       const g = nueva.find(x => x.id === v.id);
-      if(g && g.nombre === v.nombre && g.estado === v.estado && g.descripcion === v.descripcion && g.salario === v.salario){
-        lista = nueva; guardando = false; return true;
-      }
+      if(g && g.nombre === v.nombre && g.estado === v.estado){ lista = nueva; guardando = false; return { ok: true }; }
     }
   }catch(e){}
-  guardando = false; return false;
+  guardando = false;
+  if(j && j.ok) return { ok: true, aviso: true };
+  return { ok: false, razon: "El script no confirmó el guardado. Revisa la pestaña «Vacantes» de tu hoja: si la fila está, sí se guardó y basta con recargar esta página." };
 }
 
 const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "" });
@@ -224,9 +245,9 @@ $app.addEventListener("click", async e => {
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
     const v = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id));
     v.estado = v.estado === "Activa" ? "Cerrada" : "Activa";
-    const ok = await guardarVacante(v);
-    mensaje = ok ? { t: "ok", x: v.estado === "Activa" ? "Vacante reabierta." : "Vacante cerrada." }
-                 : { t: "err", x: "No se pudo confirmar el cambio. Revisa la clave e intenta de nuevo." };
+    const res = await guardarVacante(v);
+    mensaje = res.ok ? { t: "ok", x: v.estado === "Activa" ? "Vacante reabierta." : "Vacante cerrada." }
+                     : { t: "err", x: res.razon };
     render();
   }
   else if(a === "guardar"){
@@ -237,9 +258,11 @@ $app.addEventListener("click", async e => {
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
     if(!v.id) v.id = idNuevo(v.nombre);
     editando = v;
-    const ok = await guardarVacante(v);
-    if(ok){ editando = null; mensaje = { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." }; }
-    else { mensaje = { t: "err", x: "No se pudo confirmar el guardado. Revisa la clave de administrador y que el script esté publicado; luego intenta de nuevo." }; }
+    const res = await guardarVacante(v);
+    if(res.ok){
+      if(res.aviso) await cargar();
+      editando = null; mensaje = { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." };
+    } else { mensaje = { t: "err", x: res.razon }; }
     render();
   }
 });
