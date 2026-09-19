@@ -138,7 +138,7 @@ async function guardarVacante(v){
   return { ok: false, razon: "El script no confirmó el guardado. Revisa la pestaña «Vacantes» de tu hoja: si la fila está, sí se guardó y basta con recargar esta página." };
 }
 
-const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+" });
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [] });
 
 function vLista(){
   if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en el archivo config.js.</div>`;
@@ -174,6 +174,7 @@ function vForm(){
     <p class="hint">Solo las vacantes «Activa» las ven los candidatos.</p>
     <label for="f_descripcion">Descripción corta</label>
     <textarea id="f_descripcion">${esc(v.descripcion)}</textarea>
+    ${campoLista("f_responsabilidades", "Responsabilidades", v.responsabilidades, "Una por línea. Es lo que hará la persona en el día a día.")}
     ${campoLista("f_sedes", "Sedes / ciudades", v.sedes, "Una por línea. Ej: Medellín (Edificio Camacol)")}
     <label for="f_salario">Salario</label>
     <input type="text" id="f_salario" value="${esc(v.salario)}" placeholder="$7.000.000 COP">
@@ -216,6 +217,7 @@ function leerForm(){
   v.nombre = val("f_nombre").trim();
   v.estado = val("f_estado") === "Cerrada" ? "Cerrada" : "Activa";
   v.descripcion = val("f_descripcion").trim();
+  v.responsabilidades = lineas("f_responsabilidades");
   v.sedes = lineas("f_sedes");
   v.salario = val("f_salario").trim();
   v.beneficios = lineas("f_beneficios");
