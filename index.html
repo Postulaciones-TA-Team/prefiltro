@@ -423,10 +423,11 @@ function vResultado(){
     const v0 = vacById(state.vacId);
     const enlace = (v0 && v0.linkAgenda) || AGENDA_LINK;
     const cta = enlace
-      ? `<div class="actions"><a class="btn solid" href="${enlace}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`
-      : `<p style="margin-top:12px">Muy pronto encontrarás aquí el enlace para agendar tu entrevista.</p>`;
+      ? `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>
+         <div class="actions"><a class="btn solid" href="${enlace}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`
+      : `<p>Ya recibimos tus datos. El equipo de reclutamiento te escribirá al correo que nos dejaste para coordinar la entrevista.</p>`;
     return `<div class="swap"><div class="result ok"><h1 tabindex="-1">¡Genial! Tu perfil encaja</h1>
-      <p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>${cta}</div>
+      ${cta}</div>
       <div class="actions"><button class="btn" data-a="home">Volver al inicio</button></div></div>`;
   }
   return `<div class="swap"><div class="result later"><h1 tabindex="-1">Gracias por postularte</h1>

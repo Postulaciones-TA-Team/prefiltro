@@ -56,6 +56,10 @@
   .chip{font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px}
   .chip.on{background:var(--ok-soft); color:var(--ok)}
   .chip.off{background:var(--warn-soft); color:var(--warn)}
+  .chip.falta{background:var(--warn-soft); color:var(--warn)}
+  .linkbox{margin-top:14px; padding-top:14px; border-top:1px solid var(--line)}
+  .url{word-break:break-all; color:var(--muted); font-size:13px; margin:10px 0 0}
+  .aviso{color:var(--warn); margin:10px 0 0}
   .btns{display:flex; gap:8px; flex-wrap:wrap}
   .msg{padding:12px 16px; border-radius:12px; margin:16px 0; font-size:15px}
   .msg.ok{background:var(--ok-soft); color:var(--ok)}
@@ -80,6 +84,7 @@ const ENDPOINT = (window.CONFIG || {}).ENDPOINT || "";
 
 const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
 let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
+let linkAbierto = null, linkBorrador = "", bulkAbierto = false, bulkBorrador = "";
 let verPost = false, postulantes = [], postCargando = false, postError = "", filtroPostVac = "todas", filtroPostEst = "todos";
 try{ clave = sessionStorage.getItem("clave_admin") || ""; }catch(e){}
 
@@ -122,6 +127,13 @@ const MOTIVOS = {
   id: "La vacante no tiene identificador. Escribe un nombre e intenta de nuevo."
 };
 
+/* Para confirmar que la escritura llegó comparamos solo los campos de texto simple:
+   la hoja los devuelve idénticos a como se enviaron. Las listas quedan fuera a propósito,
+   porque el script las guarda unidas por saltos de línea y una diferencia de formato haría
+   que un guardado correcto pareciera fallido. */
+const CAMPOS_FIRMA = ["nombre", "estado", "descripcion", "salario", "horario", "modalidad", "tiempos", "inglesMin", "linkAgenda"];
+const firma = v => JSON.stringify(CAMPOS_FIRMA.map(c => String(v[c] == null ? "" : v[c]).trim()));
+
 async function guardarVacante(v){
   guardando = true; mensaje = { t: "info", x: "Guardando…" }; render();
   const j = await enviar(v);
@@ -129,29 +141,62 @@ async function guardarVacante(v){
     guardando = false;
     return { ok: false, razon: MOTIVOS[j.error] || ("El script rechazó el guardado (" + j.error + ").") };
   }
+  const esperas = [400, 700, 1200, 1800, 2500, 3500];
   try{
-    for(let i = 0; i < 5; i++){
-      await sleep(j && j.ok ? 500 : 1500);
+    for(const ms of esperas){
+      await sleep(ms);
       const nueva = await traer();
       const g = nueva.find(x => x.id === v.id);
-      if(g && g.nombre === v.nombre && g.estado === v.estado){ lista = nueva; guardando = false; return { ok: true }; }
+      if(g && firma(g) === firma(v)){ lista = nueva; guardando = false; return { ok: true }; }
     }
   }catch(e){}
   guardando = false;
-  if(j && j.ok) return { ok: true, aviso: true };
-  return { ok: false, razon: "El script no confirmó el guardado. Revisa la pestaña «Vacantes» de tu hoja: si la fila está, sí se guardó y basta con recargar esta página." };
+  return { ok: false, razon: "El cambio no aparece todavía en la hoja, así que no podemos confirmarlo. Abre la pestaña «Vacantes»: si el cambio está, sí se guardó y basta con actualizar esta página. Si no está, vuelve a intentarlo." };
 }
 
 const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [] });
 
-function vLista(){
-  if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en el archivo config.js.</div>`;
-  const filas = lista.length ? lista.map(v => `<div class="card"><div class="vrow">
-      <div><h2>${esc(v.nombre)}</h2><span class="chip ${v.estado === "Activa" ? "on" : "off"}">${esc(v.estado)}</span></div>
+const sinLink = v => v.estado === "Activa" && !v.linkAgenda;
+
+function editorLink(v){
+  return `<div class="linkbox">
+    <label class="hint" style="display:block;margin:0 0 6px">Link de agendamiento. Debe empezar con https://</label>
+    <input class="lk" type="text" value="${esc(linkBorrador)}" placeholder="https://calendly.com/tu-usuario/entrevista" aria-label="Link de agendamiento de ${esc(v.nombre)}">
+    <div class="btns" style="margin-top:10px">
+      <button class="btn small solid" data-a="link-guardar" data-id="${esc(v.id)}" ${guardando ? "disabled" : ""}>Guardar link</button>
+      ${v.linkAgenda ? `<button class="btn small" data-a="link-quitar" data-id="${esc(v.id)}" ${guardando ? "disabled" : ""}>Quitar</button>` : ""}
+      <button class="btn small" data-a="link-cancelar" ${guardando ? "disabled" : ""}>Cancelar</button>
+    </div></div>`;
+}
+
+function filaVacante(v){
+  const falta = sinLink(v);
+  return `<div class="card"><div class="vrow">
+      <div><h2>${esc(v.nombre)}</h2><span class="chip ${v.estado === "Activa" ? "on" : "off"}">${esc(v.estado)}</span>${falta ? ` <span class="chip falta">Sin link de agendamiento</span>` : ""}</div>
       <div class="btns">
+        <button class="btn small" data-a="link" data-id="${esc(v.id)}">${v.linkAgenda ? "Cambiar link" : "Poner link"}</button>
         <button class="btn small" data-a="editar" data-id="${esc(v.id)}">Editar</button>
         <button class="btn small" data-a="toggle" data-id="${esc(v.id)}">${v.estado === "Activa" ? "Cerrar" : "Reabrir"}</button>
-      </div></div></div>`).join("")
+      </div></div>
+    ${falta ? `<p class="hint aviso">Quien pase el prefiltro no podrá agendar: solo verá un aviso de que el enlace estará disponible pronto.</p>` : ""}
+    ${linkAbierto === v.id ? editorLink(v) : (v.linkAgenda ? `<p class="url">${esc(v.linkAgenda)}</p>` : "")}</div>`;
+}
+
+function cajaBulk(n){
+  if(!bulkAbierto) return "";
+  return `<div class="card"><h2>Poner el mismo link en todas</h2>
+    <p class="hint" style="margin:6px 0 10px">Se aplicará a las ${n} vacantes activas que hoy no tienen link. Las que ya tienen uno propio no se tocan.</p>
+    <input class="bulk" type="text" value="${esc(bulkBorrador)}" placeholder="https://calendly.com/tu-usuario/entrevista" aria-label="Link de agendamiento para todas las vacantes sin link">
+    <div class="btns" style="margin-top:10px">
+      <button class="btn small solid" data-a="bulk-aplicar" ${guardando ? "disabled" : ""}>Aplicar a las ${n}</button>
+      <button class="btn small" data-a="bulk" ${guardando ? "disabled" : ""}>Cancelar</button>
+    </div></div>`;
+}
+
+function vLista(){
+  if(!ENDPOINT) return `<div class="msg err">Falta pegar la URL del Apps Script en el archivo config.js.</div>`;
+  const faltantes = lista.filter(sinLink).length;
+  const filas = lista.length ? lista.map(filaVacante).join("")
     : (cargando ? `<p class="lead">Cargando…</p>` : `<div class="card"><p style="margin:0;color:var(--muted)">Todavía no hay vacantes. Crea la primera.</p></div>`);
   return `<h1 tabindex="-1">Administrar vacantes</h1>
     <p class="lead">Crea, edita y cierra las vacantes que ven los candidatos. Los cambios se reflejan al instante en la página pública.</p>
@@ -159,8 +204,29 @@ function vLista(){
     <input type="password" id="clave" value="${esc(clave)}" autocomplete="off">
     <p class="hint">La clave es la que pusiste en CLAVE_ADMIN dentro del Apps Script.</p>
     ${mensaje ? `<div class="msg ${mensaje.t}" role="status">${esc(mensaje.x)}</div>` : ""}
-    <div class="actions" style="margin:20px 0"><button class="btn solid" data-a="nueva">Nueva vacante</button><button class="btn" data-a="postulantes">Ver postulantes</button></div>
+    ${faltantes && !bulkAbierto ? `<div class="msg err" role="status">${faltantes === 1 ? "Hay 1 vacante activa sin link de agendamiento." : `Hay ${faltantes} vacantes activas sin link de agendamiento.`} Quien pase el prefiltro no podrá agendar entrevista.</div>` : ""}
+    <div class="actions" style="margin:20px 0"><button class="btn solid" data-a="nueva">Nueva vacante</button><button class="btn" data-a="postulantes">Ver postulantes</button>${faltantes > 1 ? `<button class="btn" data-a="bulk">Poner el mismo link en todas</button>` : ""}</div>
+    ${cajaBulk(faltantes)}
     ${filas}`;
+}
+
+async function aplicarLinkATodas(url){
+  const objetivo = lista.filter(sinLink);
+  guardando = true; mensaje = { t: "info", x: `Aplicando el link a ${objetivo.length} vacante(s)…` }; render();
+  let rechazo = null;
+  for(const v of objetivo){
+    const j = await enviar(Object.assign(vacio(), v, { linkAgenda: url }));
+    if(j && j.ok === false){ rechazo = MOTIVOS[j.error] || ("El script rechazó el guardado (" + j.error + ")."); break; }
+  }
+  guardando = false;
+  if(rechazo){ mensaje = { t: "err", x: rechazo }; return render(); }
+  await cargar();
+  const faltan = lista.filter(sinLink).length;
+  bulkAbierto = false; bulkBorrador = "";
+  mensaje = faltan
+    ? { t: "err", x: `Quedaron ${faltan} vacante(s) sin link. Vuelve a intentarlo o ponlas una por una.` }
+    : { t: "ok", x: `Link aplicado a ${objetivo.length} vacante(s).` };
+  render();
 }
 
 function campoLista(id, label, valor, hint){
@@ -291,6 +357,8 @@ $app.addEventListener("change", e => {
 
 $app.addEventListener("input", e => {
   if(e.target.id === "clave" || e.target.id === "f_clave2") guardarClave(e.target.value);
+  if(e.target.classList.contains("lk")) linkBorrador = e.target.value;
+  if(e.target.classList.contains("bulk")) bulkBorrador = e.target.value;
 });
 
 $app.addEventListener("click", async e => {
@@ -299,6 +367,31 @@ $app.addEventListener("click", async e => {
   if(a === "nueva"){ editando = vacio(); mensaje = null; render(); window.scrollTo({ top: 0 }); }
   else if(a === "editar"){ editando = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id)); mensaje = null; render(); window.scrollTo({ top: 0 }); }
   else if(a === "cancelar"){ editando = null; mensaje = null; render(); }
+  else if(a === "link"){
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
+    const v = lista.find(x => x.id === el.dataset.id);
+    linkAbierto = el.dataset.id; linkBorrador = (v && v.linkAgenda) || ""; bulkAbierto = false; mensaje = null; render();
+  }
+  else if(a === "link-cancelar"){ linkAbierto = null; linkBorrador = ""; mensaje = null; render(); }
+  else if(a === "link-guardar" || a === "link-quitar"){
+    const quitar = a === "link-quitar";
+    const url = quitar ? "" : linkBorrador.trim();
+    if(!quitar && !/^https:\/\//i.test(url)){ mensaje = { t: "err", x: "El link debe empezar con https://" }; return render(); }
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
+    const v = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id), { linkAgenda: url });
+    const res = await guardarVacante(v);
+    if(res.ok){
+      linkAbierto = null; linkBorrador = "";
+      mensaje = { t: "ok", x: quitar ? "Link quitado." : "Link guardado. Quien pase el prefiltro ya puede agendar." };
+    } else { mensaje = { t: "err", x: res.razon }; }
+    render();
+  }
+  else if(a === "bulk"){ bulkAbierto = !bulkAbierto; bulkBorrador = ""; linkAbierto = null; mensaje = null; render(); }
+  else if(a === "bulk-aplicar"){
+    if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
+    if(!/^https:\/\//i.test(bulkBorrador.trim())){ mensaje = { t: "err", x: "El link debe empezar con https://" }; return render(); }
+    await aplicarLinkATodas(bulkBorrador.trim());
+  }
   else if(a === "postulantes" || a === "refrescar"){
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador para ver los postulantes." }; return render(); }
     mensaje = null; verPost = true; cargarPostulantes();
@@ -323,7 +416,6 @@ $app.addEventListener("click", async e => {
     editando = v;
     const res = await guardarVacante(v);
     if(res.ok){
-      if(res.aviso) await cargar();
       editando = null; mensaje = { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." };
     } else { mensaje = { t: "err", x: res.razon }; }
     render();
