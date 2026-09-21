@@ -85,6 +85,7 @@ const ENDPOINT = (window.CONFIG || {}).ENDPOINT || "";
 const CAMPOS_LISTA = ["sedes", "beneficios", "etapas", "requisitos"];
 let lista = [], clave = "", editando = null, mensaje = null, guardando = false, cargando = true;
 let linkAbierto = null, linkBorrador = "", bulkAbierto = false, bulkBorrador = "";
+let postMsg = null, aprobando = null;
 let verPost = false, postulantes = [], postCargando = false, postError = "", filtroPostVac = "todas", filtroPostEst = "todos";
 try{ clave = sessionStorage.getItem("clave_admin") || ""; }catch(e){}
 
@@ -154,9 +155,10 @@ async function guardarVacante(v){
   return { ok: false, razon: "El cambio no aparece todavía en la hoja, así que no podemos confirmarlo. Abre la pestaña «Vacantes»: si el cambio está, sí se guardó y basta con actualizar esta página. Si no está, vuelve a intentarlo." };
 }
 
-const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [] });
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [], salarioMax: "" });
 
 const sinLink = v => v.estado === "Activa" && !v.linkAgenda;
+const fmtMonto = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
 function editorLink(v){
   return `<div class="linkbox">
@@ -248,6 +250,9 @@ function vForm(){
     ${campoLista("f_sedes", "Sedes / ciudades", v.sedes, "Una por línea. Ej: Medellín (Edificio Camacol)")}
     <label for="f_salario">Salario</label>
     <input type="text" id="f_salario" value="${esc(v.salario)}" placeholder="$7.000.000 COP">
+    <label for="f_salarioMax">Tope de expectativa salarial en COP (opcional)</label>
+    <input type="text" id="f_salarioMax" inputmode="numeric" value="${esc(fmtMonto(v.salarioMax))}" placeholder="7.000.000">
+    <p class="hint">Si el candidato pide más que este monto, queda «En revisión» y no recibe el link automáticamente. Déjalo vacío para no evaluar el salario en esta vacante.</p>
     ${campoLista("f_beneficios", "Beneficios", v.beneficios, "Uno por línea.")}
     <label for="f_horario">Horario</label>
     <input type="text" id="f_horario" value="${esc(v.horario)}" placeholder="Lunes a viernes, 8:00 a.m. a 6:00 p.m.">
@@ -276,7 +281,7 @@ function vForm(){
 }
 
 async function cargarPostulantes(){
-  postCargando = true; postError = ""; render();
+  postCargando = true; postError = ""; postMsg = null; render();
   try{
     const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ tipo: "postulantes_listar", clave }) });
     const j = await r.json();
@@ -288,6 +293,44 @@ async function cargarPostulantes(){
   postCargando = false; render();
 }
 
+async function cambiarEstadoPostulante(fecha, correo, estado){
+  try{
+    const r = await fetch(ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ tipo: "postulante_estado", clave, fecha, correo, estado }) });
+    const j = await r.json();
+    if(j.ok && j.actualizado) return { ok: true };
+    if(j.ok) return { ok: false, razon: "El script de Google todavía es una versión anterior y no sabe aprobar postulantes. Pega el apps_script.gs nuevo y publica una versión nueva." };
+    if(j.error === "no_encontrado") return { ok: false, razon: "No se encontró a esa persona en la hoja. Presiona «Actualizar» e intenta de nuevo." };
+    return { ok: false, razon: MOTIVOS[j.error] || ("El script rechazó el cambio (" + j.error + ").") };
+  }catch(e){
+    return { ok: false, razon: "No se pudo confirmar el cambio desde aquí. Revisa la columna «Estado» en la pestaña «Postulantes» de tu hoja." };
+  }
+}
+
+function linkParaVacante(nombre){
+  const v = lista.find(x => x.nombre === nombre);
+  return (v && v.linkAgenda) || (window.CONFIG || {}).AGENDA_LINK || "";
+}
+
+function mailtoLink(p){
+  const link = linkParaVacante(p.vacante);
+  if(!link) return "";
+  const asunto = "Agenda tu entrevista - " + p.vacante;
+  const cuerpo = "Hola " + p.nombre + ",\n\nGracias por postularte a " + p.vacante + ". Tu perfil avanzó en el proceso. Agenda tu entrevista en este enlace:\n" + link + "\n\n¡Quedamos atentos!";
+  return "mailto:" + encodeURIComponent(p.correo) + "?subject=" + encodeURIComponent(asunto) + "&body=" + encodeURIComponent(cuerpo);
+}
+
+function accionesPostulante(p){
+  if(p.estado === "En revisión"){
+    const ocupado = aprobando === p.fecha + "|" + p.correo;
+    return `<div class="btns" style="margin-top:12px"><button class="btn small solid" data-a="aprobar" data-fecha="${esc(p.fecha)}" data-correo="${esc(p.correo)}" ${ocupado ? "disabled" : ""}>${ocupado ? "Aprobando…" : "Aprobar"}</button></div>`;
+  }
+  if(p.estado === "Apto"){
+    const m = mailtoLink(p);
+    return m ? `<div class="btns" style="margin-top:12px"><a class="btn small" style="text-decoration:none;display:inline-flex;align-items:center" href="${m}">Enviar link por correo</a></div>` : "";
+  }
+  return "";
+}
+
 function vPostulantes(){
   const vacs = [...new Set(postulantes.map(p => p.vacante))].filter(Boolean);
   const vis = postulantes.filter(p => (filtroPostVac === "todas" || p.vacante === filtroPostVac) && (filtroPostEst === "todos" || p.estado === filtroPostEst));
@@ -295,7 +338,7 @@ function vPostulantes(){
   const cuerpo = postCargando ? `<p class="lead">Cargando postulantes…</p>`
     : postError ? `<div class="msg err" role="alert">${esc(postError)}</div>`
     : !postulantes.length ? `<div class="card"><p style="margin:0;color:var(--muted)">Todavía no hay postulantes.</p></div>`
-    : `<p class="hint" style="margin:12px 0 16px">${vis.length} de ${postulantes.length} postulantes (${aptos} aptos recibieron el link de entrevista).</p>` +
+    : (postMsg ? `<div class="msg ${postMsg.t}" role="status">${esc(postMsg.x)}</div>` : "") + `<p class="hint" style="margin:12px 0 16px">${vis.length} de ${postulantes.length} postulantes (${aptos} aptos recibieron el link de entrevista).</p>` +
       vis.map(p => `<div class="card"><div class="vrow">
         <div><h2>${esc(p.nombre)}</h2><a href="mailto:${esc(p.correo)}">${esc(p.correo)}</a></div>
         <span class="chip ${p.estado === "Apto" ? "on" : "off"}">${esc(p.estado)}</span></div>
@@ -303,7 +346,9 @@ function vPostulantes(){
         <details><summary>Ver respuestas</summary>
           <p><strong>Tiempo completo:</strong> ${esc(p.tiempoCompleto)}. <strong>Viaje planeado:</strong> ${esc(p.viaje)}. <strong>Inglés:</strong> ${esc(p.ingles)}.</p>
           ${p.fallas ? `<p><strong>No cumple:</strong> ${esc(p.fallas)}</p>` : ""}
-          <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p></details></div>`).join("");
+          <p><strong>Expectativa salarial:</strong> ${p.expectativa ? "$" + esc(fmtMonto(p.expectativa)) : "sin dato"}${(() => { const vv = lista.find(x => x.nombre === p.vacante); return vv && vv.salarioMax ? " (tope de la vacante: $" + esc(fmtMonto(vv.salarioMax)) + ")" : ""; })()}</p>
+          <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p></details>
+        ${accionesPostulante(p)}</div>`).join("");
   return `<button class="linkback" data-a="volver-lista">← Volver a las vacantes</button>
     <h1 tabindex="-1">Postulantes</h1>
     <p class="lead" style="margin-bottom:12px">Quienes completaron el prefiltro. «Apto» recibió el link de agendamiento; «En revisión» solo vio un mensaje de que se les contactará.</p>
@@ -339,6 +384,7 @@ function leerForm(){
   v.palabrasClave = val("f_palabrasClave").split(",").map(x => quitaTildes(x.trim().toLowerCase())).filter(Boolean);
   v.inglesMin = val("f_inglesMin") || "B2+";
   v.linkAgenda = val("f_linkAgenda").trim();
+  v.salarioMax = val("f_salarioMax").replace(/\D/g, "");
   return v;
 }
 
@@ -359,6 +405,7 @@ $app.addEventListener("input", e => {
   if(e.target.id === "clave" || e.target.id === "f_clave2") guardarClave(e.target.value);
   if(e.target.classList.contains("lk")) linkBorrador = e.target.value;
   if(e.target.classList.contains("bulk")) bulkBorrador = e.target.value;
+  if(e.target.id === "f_salarioMax") e.target.value = fmtMonto(e.target.value);
 });
 
 $app.addEventListener("click", async e => {
@@ -397,6 +444,19 @@ $app.addEventListener("click", async e => {
     mensaje = null; verPost = true; cargarPostulantes();
   }
   else if(a === "volver-lista"){ verPost = false; render(); }
+  else if(a === "aprobar"){
+    if(!clave){ postMsg = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
+    const fecha = el.dataset.fecha, correo = el.dataset.correo;
+    aprobando = fecha + "|" + correo; postMsg = null; render();
+    const res = await cambiarEstadoPostulante(fecha, correo, "Apto");
+    aprobando = null;
+    if(res.ok){
+      const p = postulantes.find(x => x.fecha === fecha && x.correo === correo);
+      if(p) p.estado = "Apto";
+      postMsg = { t: "ok", x: (p ? p.nombre : "La persona") + " quedó como Apto. Usa el botón «Enviar link por correo» de su tarjeta para mandarle el link de la entrevista." };
+    } else { postMsg = { t: "err", x: res.razon }; }
+    render();
+  }
   else if(a === "toggle"){
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
     const v = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id));
@@ -416,7 +476,12 @@ $app.addEventListener("click", async e => {
     editando = v;
     const res = await guardarVacante(v);
     if(res.ok){
-      editando = null; mensaje = { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." };
+      const g = lista.find(x => x.id === v.id);
+      const scriptViejo = v.salarioMax && g && g.salarioMax === undefined;
+      editando = null;
+      mensaje = scriptViejo
+        ? { t: "err", x: "La vacante se guardó, pero el script de Google es una versión anterior y no guarda el tope salarial. Pega el apps_script.gs nuevo y publica una versión nueva." }
+        : { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." };
     } else { mensaje = { t: "err", x: res.razon }; }
     render();
   }
