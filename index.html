@@ -207,7 +207,8 @@ const NIVELES_INGLES = ["A1 a B1", "B2", "B2+", "C1", "Nativo"];
 const NIVELES_REQ = ["ninguno", "B2", "B2+", "C1", "Nativo"];
 const nivelIdx = n => NIVELES_INGLES.indexOf(n);
 const inglesOk = (v, nivel) => v.inglesMin === "ninguno" || nivelIdx(nivel) >= nivelIdx(v.inglesMin);
-const nPreg = v => v.inglesMin === "ninguno" ? 3 : 4;
+const nPreg = v => (v.inglesMin === "ninguno" ? 3 : 4) + 1;   // +1: expectativa salarial (siempre es la última)
+const fmtCOP = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const MIN_CARACTERES = 25;
 
 /* ============================================================ */
@@ -227,6 +228,7 @@ function normalizar(v){
     tiempos: esc(v.tiempos), requisitos: lst(v.requisitos),
     palabrasClave: arr(v.palabrasClave).map(k => norm(String(k))),
     inglesMin: NIVELES_REQ.includes(v.inglesMin) ? v.inglesMin : "B2+",
+    salarioMax: Number(String(v.salarioMax == null ? "" : v.salarioMax).replace(/\D/g, "")) || 0,
     linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : ""
   };
 }
@@ -265,7 +267,7 @@ const hasTema = (id, v) => ({
   etapas: arr(v.etapas).length > 0 || !!v.tiempos
 }[id]);
 
-let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null }, datos: { nombre: "", correo: "" }, err: "" };
+let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null, salario: "" }, datos: { nombre: "", correo: "" }, err: "" };
 
 const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
 const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
@@ -342,7 +344,7 @@ function vConsent(){
   const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
   return `<div class="swap">${back("vac-page","Volver a la vacante")}
     <h1 tabindex="-1">Antes de empezar</h1>
-    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : " y nivel de inglés"}.</p>
+    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : ", nivel de inglés"} y expectativa salarial.</p>
     <div class="sheet" style="padding:20px">
       <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. Solo el equipo de reclutamiento puede consultarla.</p>
       <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
@@ -392,9 +394,16 @@ function vPregunta(){
     body = `<h1 tabindex="-1">¿Tienes disponibilidad de tiempo completo?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("full")}`;
   } else if(s === 2){
     body = `<h1 tabindex="-1">¿Tienes algún viaje planeado próximamente?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("viaje")}`;
-  } else {
+  } else if(s < nPreg(vacById(state.vacId)) - 1){
     body = `<h1 tabindex="-1">¿Cuál es tu nivel de inglés?</h1><p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>
       <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
+  } else {
+    body = `<h1 tabindex="-1">¿Cuál es tu expectativa salarial?</h1>
+      <p class="lead" style="margin-bottom:8px">Escribe el monto mensual en pesos colombianos (COP).</p>
+      <label class="fld" for="salario">Expectativa salarial mensual</label>
+      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" placeholder="4.500.000" value="${fmtCOP(a.salario)}">
+      ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
+      <div class="actions"><button class="btn solid" data-a="salario-ok">Enviar mis respuestas</button></div>`;
   }
   return `<div class="swap">${prev}${progress()}${body}
     <p class="note">${ENDPOINT ? "Guardamos tus respuestas junto con tu nombre y correo para el proceso de selección." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
@@ -408,13 +417,16 @@ function evaluarCodigos(){
   if(a.full !== "Sí") f.push("full");
   if(a.viaje !== "No") f.push("viaje");
   if(!inglesOk(v, a.ingles)) f.push("ingles");
+  const pide = Number(String(a.salario || "").replace(/\D/g, "")) || 0;
+  if(v.salarioMax > 0 && pide > v.salarioMax) f.push("salario");
   return f;
 }
 const MOTIVOS = {
   exp: "Tu experiencia descrita no parece relacionada con las funciones de esta vacante.",
   full: "Esta vacante requiere disponibilidad de tiempo completo.",
   viaje: "Por ahora buscamos personas sin viajes planeados en el corto plazo.",
-  ingles: "Esta vacante requiere un nivel de inglés B2+ o superior."
+  ingles: "Esta vacante requiere un nivel de inglés B2+ o superior.",
+  salario: "Tu expectativa salarial está por encima del rango de esta vacante."
 };
 
 function vResultado(){
@@ -455,7 +467,13 @@ function render(){
   }
 }
 
-function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null }; state.datos = { nombre: "", correo: "" }; }
+function finalizar(){
+  const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
+  state.view = "resultado"; render();
+  enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim(), expectativaSalarial: Number(String(a.salario || "").replace(/\D/g, "")) || 0 });
+}
+
+function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "" }; state.datos = { nombre: "", correo: "" }; }
 
 $app.addEventListener("click", e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
@@ -495,17 +513,26 @@ $app.addEventListener("click", e => {
   }
   else if(act === "ans"){
     state.ans[el.dataset.k] = el.dataset.v;
-    if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else {
-      const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
-      state.view = "resultado"; render();
-      enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim() });
-    }
+    if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else { finalizar(); }
+  }
+  else if(act === "salario-ok"){
+    const inp = document.getElementById("salario");
+    const digitos = ((inp ? inp.value : state.ans.salario) || "").replace(/\D/g, "");
+    state.ans.salario = digitos;
+    const n = Number(digitos);
+    if(!(n >= 300000 && n <= 100000000)){ state.err = "Escribe tu expectativa mensual completa en pesos, por ejemplo 4.500.000."; return render(); }
+    state.err = "";
+    finalizar();
   }
 });
 
 $app.addEventListener("input", e => {
   if(e.target.id === "nombre") state.datos.nombre = e.target.value;
   if(e.target.id === "correo") state.datos.correo = e.target.value;
+  if(e.target.id === "salario"){
+    const d = e.target.value.replace(/\D/g, "").slice(0, 10);
+    state.ans.salario = d; e.target.value = fmtCOP(d);
+  }
 });
 
 $app.addEventListener("change", e => {
