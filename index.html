@@ -401,7 +401,7 @@ function vPregunta(){
     body = `<h1 tabindex="-1">¿Cuál es tu expectativa salarial?</h1>
       <p class="lead" style="margin-bottom:8px">Escribe el monto mensual en pesos colombianos (COP).</p>
       <label class="fld" for="salario">Expectativa salarial mensual</label>
-      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" placeholder="4.500.000" value="${fmtCOP(a.salario)}">
+      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtCOP(a.salario)}">
       ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
       <div class="actions"><button class="btn solid" data-a="salario-ok">Enviar mis respuestas</button></div>`;
   }
