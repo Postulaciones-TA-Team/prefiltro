@@ -155,7 +155,13 @@ async function guardarVacante(v){
   return { ok: false, razon: "El cambio no aparece todavía en la hoja, así que no podemos confirmarlo. Abre la pestaña «Vacantes»: si el cambio está, sí se guardó y basta con actualizar esta página. Si no está, vuelve a intentarlo." };
 }
 
-const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [], salarioMax: "" });
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [], salarioMax: "", monedaSalarioMax: "COP", rec1Nombre: "", rec2Nombre: "", rec2Link: "", rec3Nombre: "", rec3Link: "" });
+const MONEDAS = [
+  { code: "COP", label: "COP - Pesos colombianos" },
+  { code: "USD", label: "USD - Dólares" },
+  { code: "EUR", label: "EUR - Euros" },
+  { code: "MXN", label: "MXN - Pesos mexicanos" }
+];
 
 const sinLink = v => v.estado === "Activa" && !v.linkAgenda;
 const fmtMonto = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -250,9 +256,12 @@ function vForm(){
     ${campoLista("f_sedes", "Sedes / ciudades", v.sedes, "Una por línea. Ej: Medellín (Edificio Camacol)")}
     <label for="f_salario">Salario</label>
     <input type="text" id="f_salario" value="${esc(v.salario)}" placeholder="$7.000.000 COP">
-    <label for="f_salarioMax">Tope de expectativa salarial en COP (opcional)</label>
-    <input type="text" id="f_salarioMax" inputmode="numeric" value="${esc(fmtMonto(v.salarioMax))}" placeholder="7.000.000">
-    <p class="hint">Si el candidato pide más que este monto, queda «En revisión» y no recibe el link automáticamente. Déjalo vacío para no evaluar el salario en esta vacante.</p>
+    <label for="f_salarioMax">Tope de expectativa salarial (opcional)</label>
+    <div style="display:flex;gap:10px">
+      <input type="text" id="f_salarioMax" inputmode="numeric" value="${esc(fmtMonto(v.salarioMax))}" placeholder="7.000.000" style="flex:2">
+      <select id="f_monedaSalarioMax" style="flex:1">${MONEDAS.map(m => `<option value="${m.code}" ${(v.monedaSalarioMax || "COP") === m.code ? "selected" : ""}>${m.code}</option>`).join("")}</select>
+    </div>
+    <p class="hint">Si el candidato pide más que este monto en la MISMA moneda, queda «En revisión» y no recibe el link automáticamente. Si elige otra moneda, el prefiltro no evalúa el salario (no hay conversión automática). Deja el monto vacío para no evaluar el salario en esta vacante.</p>
     ${campoLista("f_beneficios", "Beneficios", v.beneficios, "Uno por línea.")}
     <label for="f_horario">Horario</label>
     <input type="text" id="f_horario" value="${esc(v.horario)}" placeholder="Lunes a viernes, 8:00 a.m. a 6:00 p.m.">
@@ -270,9 +279,21 @@ function vForm(){
       ${[["ninguno","No se requiere inglés"],["B2","B2 o superior"],["B2+","B2+ o superior"],["C1","C1 o superior"],["Nativo","Nativo"]].map(([k,t]) => `<option value="${k}" ${(v.inglesMin || "B2+") === k ? "selected" : ""}>${t}</option>`).join("")}
     </select>
     <p class="hint">Si eliges «No se requiere inglés», el prefiltro no le hace esa pregunta al candidato.</p>
-    <label for="f_linkAgenda">Link de agendamiento (opcional)</label>
-    <input type="text" id="f_linkAgenda" value="${esc(v.linkAgenda)}" placeholder="https://...">
-    <p class="hint">Si lo dejas vacío, se usa el link general de index.html. Debe empezar con https://</p>
+    <h2 style="margin-top:28px">Reclutadores para agendar</h2>
+    <p class="hint" style="margin-top:0">Hasta 3 reclutadores trabajando esta vacante. El candidato verá el nombre de cada uno y podrá elegir con quién agendar. Deja el link vacío en los que no uses.</p>
+    <label for="f_rec1Nombre">Reclutador 1 — nombre</label>
+    <input type="text" id="f_rec1Nombre" value="${esc(v.rec1Nombre)}" placeholder="Mari Solórzano">
+    <label for="f_linkAgenda">Reclutador 1 — link de agendamiento</label>
+    <input type="text" id="f_linkAgenda" value="${esc(v.linkAgenda)}" placeholder="https://calendly.com/...">
+    <label for="f_rec2Nombre">Reclutador 2 — nombre</label>
+    <input type="text" id="f_rec2Nombre" value="${esc(v.rec2Nombre)}" placeholder="Nombre del reclutador">
+    <label for="f_rec2Link">Reclutador 2 — link de agendamiento</label>
+    <input type="text" id="f_rec2Link" value="${esc(v.rec2Link)}" placeholder="https://calendly.com/...">
+    <label for="f_rec3Nombre">Reclutador 3 — nombre</label>
+    <input type="text" id="f_rec3Nombre" value="${esc(v.rec3Nombre)}" placeholder="Nombre del reclutador">
+    <label for="f_rec3Link">Reclutador 3 — link de agendamiento</label>
+    <input type="text" id="f_rec3Link" value="${esc(v.rec3Link)}" placeholder="https://calendly.com/...">
+    <p class="hint">Si solo llenas el Reclutador 1, el candidato ve un único botón, como hasta ahora. Con 2 o más, ve un botón por cada uno. Si dejas los tres vacíos, se usa el link general de index.html.</p>
     <label for="f_clave2">Clave de administrador</label>
     <input type="password" id="f_clave2" value="${esc(clave)}" autocomplete="off">
     ${mensaje ? `<div class="msg ${mensaje.t}" role="status">${esc(mensaje.x)}</div>` : ""}
@@ -308,7 +329,10 @@ async function cambiarEstadoPostulante(fecha, correo, estado){
 
 function linkParaVacante(nombre){
   const v = lista.find(x => x.nombre === nombre);
-  return (v && v.linkAgenda) || (window.CONFIG || {}).AGENDA_LINK || "";
+  if(v && v.linkAgenda) return v.linkAgenda;
+  if(v && v.rec2Link) return v.rec2Link;
+  if(v && v.rec3Link) return v.rec3Link;
+  return (window.CONFIG || {}).AGENDA_LINK || "";
 }
 
 function mailtoLink(p){
@@ -346,7 +370,7 @@ function vPostulantes(){
         <details><summary>Ver respuestas</summary>
           <p><strong>Tiempo completo:</strong> ${esc(p.tiempoCompleto)}. <strong>Viaje planeado:</strong> ${esc(p.viaje)}. <strong>Inglés:</strong> ${esc(p.ingles)}.</p>
           ${p.fallas ? `<p><strong>No cumple:</strong> ${esc(p.fallas)}</p>` : ""}
-          <p><strong>Expectativa salarial:</strong> ${p.expectativa ? "$" + esc(fmtMonto(p.expectativa)) : "sin dato"}${(() => { const vv = lista.find(x => x.nombre === p.vacante); return vv && vv.salarioMax ? " (tope de la vacante: $" + esc(fmtMonto(vv.salarioMax)) + ")" : ""; })()}</p>
+          <p><strong>Expectativa salarial:</strong> ${p.expectativa ? esc(p.moneda || "COP") + " " + esc(fmtMonto(p.expectativa)) : "sin dato"}${(() => { const vv = lista.find(x => x.nombre === p.vacante); return vv && vv.salarioMax ? " (tope de la vacante: " + esc(vv.monedaSalarioMax || "COP") + " " + esc(fmtMonto(vv.salarioMax)) + ")" : ""; })()}</p>
           <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p></details>
         ${accionesPostulante(p)}</div>`).join("");
   return `<button class="linkback" data-a="volver-lista">← Volver a las vacantes</button>
@@ -385,6 +409,12 @@ function leerForm(){
   v.inglesMin = val("f_inglesMin") || "B2+";
   v.linkAgenda = val("f_linkAgenda").trim();
   v.salarioMax = val("f_salarioMax").replace(/\D/g, "");
+  v.monedaSalarioMax = val("f_monedaSalarioMax") || "COP";
+  v.rec1Nombre = val("f_rec1Nombre").trim();
+  v.rec2Nombre = val("f_rec2Nombre").trim();
+  v.rec2Link = val("f_rec2Link").trim();
+  v.rec3Nombre = val("f_rec3Nombre").trim();
+  v.rec3Link = val("f_rec3Link").trim();
   return v;
 }
 
@@ -468,8 +498,11 @@ $app.addEventListener("click", async e => {
   }
   else if(a === "guardar"){
     const v = leerForm();
+    editando = v; // conserva lo escrito en pantalla aunque una validación falle abajo
     if(!v.nombre){ mensaje = { t: "err", x: "Escribe el nombre de la vacante." }; return render(); }
-    if(v.linkAgenda && !/^https:\/\//i.test(v.linkAgenda)){ mensaje = { t: "err", x: "El link de agendamiento debe empezar con https://" }; return render(); }
+    if(v.linkAgenda && !/^https:\/\//i.test(v.linkAgenda)){ mensaje = { t: "err", x: "El link del Reclutador 1 debe empezar con https://" }; return render(); }
+    if(v.rec2Link && !/^https:\/\//i.test(v.rec2Link)){ mensaje = { t: "err", x: "El link del Reclutador 2 debe empezar con https://" }; return render(); }
+    if(v.rec3Link && !/^https:\/\//i.test(v.rec3Link)){ mensaje = { t: "err", x: "El link del Reclutador 3 debe empezar con https://" }; return render(); }
     const c = val("f_clave2"); if(c) guardarClave(c);
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador." }; return render(); }
     if(!v.id) v.id = idNuevo(v.nombre);
