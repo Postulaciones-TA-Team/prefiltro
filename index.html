@@ -208,7 +208,14 @@ const NIVELES_REQ = ["ninguno", "B2", "B2+", "C1", "Nativo"];
 const nivelIdx = n => NIVELES_INGLES.indexOf(n);
 const inglesOk = (v, nivel) => v.inglesMin === "ninguno" || nivelIdx(nivel) >= nivelIdx(v.inglesMin);
 const nPreg = v => (v.inglesMin === "ninguno" ? 3 : 4) + 1;   // +1: expectativa salarial (siempre es la última)
-const fmtCOP = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const fmtMonto = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const MONEDAS = [
+  { code: "COP", label: "Pesos colombianos (COP)", simbolo: "$" },
+  { code: "USD", label: "Dólares (USD)", simbolo: "US$" },
+  { code: "EUR", label: "Euros (EUR)", simbolo: "€" },
+  { code: "MXN", label: "Pesos mexicanos (MXN)", simbolo: "MX$" }
+];
+const monedaSimbolo = c => (MONEDAS.find(m => m.code === c) || MONEDAS[0]).simbolo;
 const MIN_CARACTERES = 25;
 
 /* ============================================================ */
@@ -229,7 +236,13 @@ function normalizar(v){
     palabrasClave: arr(v.palabrasClave).map(k => norm(String(k))),
     inglesMin: NIVELES_REQ.includes(v.inglesMin) ? v.inglesMin : "B2+",
     salarioMax: Number(String(v.salarioMax == null ? "" : v.salarioMax).replace(/\D/g, "")) || 0,
-    linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : ""
+    monedaSalarioMax: MONEDAS.some(m => m.code === v.monedaSalarioMax) ? v.monedaSalarioMax : "COP",
+    linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : "",
+    reclutadores: [
+      { nombre: esc(v.rec1Nombre) || "Reclutador 1", link: v.linkAgenda },
+      { nombre: esc(v.rec2Nombre) || "Reclutador 2", link: v.rec2Link },
+      { nombre: esc(v.rec3Nombre) || "Reclutador 3", link: v.rec3Link }
+    ].filter(r => /^https:\/\//i.test(r.link || "")).map(r => ({ nombre: r.nombre, link: esc(r.link) }))
   };
 }
 async function cargarVacantes(){
@@ -267,7 +280,7 @@ const hasTema = (id, v) => ({
   etapas: arr(v.etapas).length > 0 || !!v.tiempos
 }[id]);
 
-let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null, salario: "" }, datos: { nombre: "", correo: "" }, err: "" };
+let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: "COP" }, datos: { nombre: "", correo: "" }, err: "" };
 
 const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
 const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
@@ -307,10 +320,9 @@ function vHome(){
     <h1 tabindex="-1">Vacantes disponibles</h1>
     <p class="lead">Elige una vacante para conocer los detalles y averiguar si tu perfil encaja.</p>
     ${a.map(v => {
-      const chips = [arr(v.sedes).map(x => x.split(" (")[0]).join(", "), v.modalidad ? v.modalidad.split(";")[0] : ""].filter(Boolean);
+      const chips = [...arr(v.sedes).map(x => x.split(" (")[0]), v.modalidad ? v.modalidad.split(";")[0].trim() : "", v.horario || ""].filter(Boolean);
       return `<button class="vac" data-a="vac" data-id="${esc(v.id)}">
         <h2>${v.nombre}</h2>
-        ${v.descripcion ? `<p style="color:var(--muted);margin:0">${v.descripcion.split(". ")[0].replace(/\.$/, "")}.</p>` : ""}
         ${chips.length ? `<div class="chips">${chips.map(c => `<span class="chip">${c}</span>`).join("")}</div>` : ""}
       </button>`;
     }).join("")}
@@ -399,9 +411,11 @@ function vPregunta(){
       <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
   } else {
     body = `<h1 tabindex="-1">¿Cuál es tu expectativa salarial?</h1>
-      <p class="lead" style="margin-bottom:8px">Escribe el monto mensual en pesos colombianos (COP).</p>
+      <p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>
+      <label class="fld" for="moneda">Moneda</label>
+      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${a.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>
       <label class="fld" for="salario">Expectativa salarial mensual</label>
-      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtCOP(a.salario)}">
+      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtMonto(a.salario)}">
       ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
       <div class="actions"><button class="btn solid" data-a="salario-ok">Enviar mis respuestas</button></div>`;
   }
@@ -418,7 +432,7 @@ function evaluarCodigos(){
   if(a.viaje !== "No") f.push("viaje");
   if(!inglesOk(v, a.ingles)) f.push("ingles");
   const pide = Number(String(a.salario || "").replace(/\D/g, "")) || 0;
-  if(v.salarioMax > 0 && pide > v.salarioMax) f.push("salario");
+  if(v.salarioMax > 0 && a.moneda === v.monedaSalarioMax && pide > v.salarioMax) f.push("salario");
   return f;
 }
 const MOTIVOS = {
@@ -432,12 +446,21 @@ const MOTIVOS = {
 function vResultado(){
   const apto = evaluarCodigos().length === 0;
   if(apto){
-    const v0 = vacById(state.vacId);
-    const enlace = (v0 && v0.linkAgenda) || AGENDA_LINK;
-    const cta = enlace
-      ? `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>
-         <div class="actions"><a class="btn solid" href="${enlace}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`
-      : `<p>Ya recibimos tus datos. El equipo de reclutamiento te escribirá al correo que nos dejaste para coordinar la entrevista.</p>`;
+    const v0 = vacById(state.vacId) || {};
+    const recs = arr(v0.reclutadores);
+    let cta;
+    if(recs.length > 1){
+      cta = `<p>Ya recibimos tus datos. Te invito a agendar con uno de nuestros ${recs.length} reclutadores (de preferencia el que te contactó).</p>
+        <div class="actions" style="flex-direction:column;align-items:stretch">${recs.map(r => `<a class="btn solid" href="${r.link}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Agendar con ${r.nombre}</a>`).join("")}</div>`;
+    } else if(recs.length === 1){
+      cta = `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con ${recs[0].nombre}.</p>
+        <div class="actions"><a class="btn solid" href="${recs[0].link}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`;
+    } else if(AGENDA_LINK){
+      cta = `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>
+        <div class="actions"><a class="btn solid" href="${AGENDA_LINK}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`;
+    } else {
+      cta = `<p>Ya recibimos tus datos. El equipo de reclutamiento te escribirá al correo que nos dejaste para coordinar la entrevista.</p>`;
+    }
     return `<div class="swap"><div class="result ok"><h1 tabindex="-1">¡Genial! Tu perfil encaja</h1>
       ${cta}</div>
       <div class="actions"><button class="btn" data-a="home">Volver al inicio</button></div></div>`;
@@ -470,10 +493,10 @@ function render(){
 function finalizar(){
   const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
   state.view = "resultado"; render();
-  enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim(), expectativaSalarial: Number(String(a.salario || "").replace(/\D/g, "")) || 0 });
+  enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim(), expectativaSalarial: Number(String(a.salario || "").replace(/\D/g, "")) || 0, monedaSalarial: a.moneda });
 }
 
-function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "" }; state.datos = { nombre: "", correo: "" }; }
+function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: "COP" }; state.datos = { nombre: "", correo: "" }; }
 
 $app.addEventListener("click", e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
@@ -531,12 +554,13 @@ $app.addEventListener("input", e => {
   if(e.target.id === "correo") state.datos.correo = e.target.value;
   if(e.target.id === "salario"){
     const d = e.target.value.replace(/\D/g, "").slice(0, 10);
-    state.ans.salario = d; e.target.value = fmtCOP(d);
+    state.ans.salario = d; e.target.value = fmtMonto(d);
   }
 });
 
 $app.addEventListener("change", e => {
   if(e.target.id === "okDatos"){ document.getElementById("btnAcepto").disabled = !e.target.checked; }
+  if(e.target.id === "moneda") state.ans.moneda = e.target.value;
 });
 
 render();
