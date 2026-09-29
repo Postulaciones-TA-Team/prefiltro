@@ -210,12 +210,13 @@ const inglesOk = (v, nivel) => v.inglesMin === "ninguno" || nivelIdx(nivel) >= n
 const nPreg = v => (v.inglesMin === "ninguno" ? 3 : 4) + 1;   // +1: expectativa salarial (siempre es la última)
 const fmtMonto = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const MONEDAS = [
-  { code: "COP", label: "Pesos colombianos (COP)", simbolo: "$" },
-  { code: "USD", label: "Dólares (USD)", simbolo: "US$" },
-  { code: "EUR", label: "Euros (EUR)", simbolo: "€" },
-  { code: "MXN", label: "Pesos mexicanos (MXN)", simbolo: "MX$" }
+  { code: "COP", label: "Pesos colombianos (COP)", simbolo: "$", min: 300000, max: 100000000, ejemplo: "4.500.000" },
+  { code: "USD", label: "Dólares (USD)", simbolo: "US$", min: 200, max: 50000, ejemplo: "1.500" },
+  { code: "EUR", label: "Euros (EUR)", simbolo: "€", min: 200, max: 50000, ejemplo: "1.500" },
+  { code: "MXN", label: "Pesos mexicanos (MXN)", simbolo: "MX$", min: 3000, max: 800000, ejemplo: "25.000" }
 ];
 const monedaSimbolo = c => (MONEDAS.find(m => m.code === c) || MONEDAS[0]).simbolo;
+const monedaInfo = c => MONEDAS.find(m => m.code === c) || MONEDAS[0];
 const MIN_CARACTERES = 25;
 
 /* ============================================================ */
@@ -410,11 +411,15 @@ function vPregunta(){
     body = `<h1 tabindex="-1">¿Cuál es tu nivel de inglés?</h1><p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>
       <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
   } else {
+    const v = vacById(state.vacId);
+    const monedaFija = v && v.salarioMax > 0;
     body = `<h1 tabindex="-1">¿Cuál es tu expectativa salarial?</h1>
-      <p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>
+      ${monedaFija
+        ? `<p class="lead" style="margin-bottom:8px">Esta vacante evalúa el salario en <strong>${monedaInfo(v.monedaSalarioMax).label}</strong>. Escribe tu expectativa mensual en esa moneda.</p>`
+        : `<p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>
       <label class="fld" for="moneda">Moneda</label>
-      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${a.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>
-      <label class="fld" for="salario">Expectativa salarial mensual</label>
+      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${a.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>`}
+      <label class="fld" for="salario">Expectativa salarial mensual${monedaFija ? ` (${v.monedaSalarioMax})` : ""}</label>
       <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtMonto(a.salario)}">
       ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
       <div class="actions"><button class="btn solid" data-a="salario-ok">Enviar mis respuestas</button></div>`;
@@ -496,7 +501,12 @@ function finalizar(){
   enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim(), expectativaSalarial: Number(String(a.salario || "").replace(/\D/g, "")) || 0, monedaSalarial: a.moneda });
 }
 
-function reiniciarFiltro(){ state.step = 0; state.err = ""; state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: "COP" }; state.datos = { nombre: "", correo: "" }; }
+function reiniciarFiltro(){
+  const v = vacById(state.vacId);
+  state.step = 0; state.err = "";
+  state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: (v && v.salarioMax > 0) ? v.monedaSalarioMax : "COP" };
+  state.datos = { nombre: "", correo: "" };
+}
 
 $app.addEventListener("click", e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
@@ -543,7 +553,8 @@ $app.addEventListener("click", e => {
     const digitos = ((inp ? inp.value : state.ans.salario) || "").replace(/\D/g, "");
     state.ans.salario = digitos;
     const n = Number(digitos);
-    if(!(n >= 300000 && n <= 100000000)){ state.err = "Escribe tu expectativa mensual completa en pesos, por ejemplo 4.500.000."; return render(); }
+    const m = monedaInfo(state.ans.moneda);
+    if(!(n >= m.min && n <= m.max)){ state.err = `Escribe tu expectativa mensual completa en ${m.code}, por ejemplo ${m.ejemplo}.`; return render(); }
     state.err = "";
     finalizar();
   }
