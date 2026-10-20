@@ -206,8 +206,7 @@ let carga = { estado: ENDPOINT ? "cargando" : "listo" };
 const NIVELES_INGLES = ["A1 a B1", "B2", "B2+", "C1", "Nativo"];
 const NIVELES_REQ = ["ninguno", "B2", "B2+", "C1", "Nativo"];
 const nivelIdx = n => NIVELES_INGLES.indexOf(n);
-const inglesOk = (v, nivel) => v.inglesMin === "ninguno" || nivelIdx(nivel) >= nivelIdx(v.inglesMin);
-const nPreg = v => (v.inglesMin === "ninguno" ? 3 : 4) + 1;   // +1: expectativa salarial (siempre es la última)
+const nPreg = v => arr(v && v.preguntas).length;
 const fmtMonto = n => String(n == null ? "" : n).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const MONEDAS = [
   { code: "COP", label: "Pesos colombianos (COP)", simbolo: "$", min: 300000, max: 100000000, ejemplo: "4.500.000" },
@@ -218,6 +217,61 @@ const MONEDAS = [
 const monedaSimbolo = c => (MONEDAS.find(m => m.code === c) || MONEDAS[0]).simbolo;
 const monedaInfo = c => MONEDAS.find(m => m.code === c) || MONEDAS[0];
 const MIN_CARACTERES = 25;
+
+/* ---------- Preguntas del prefiltro ----------
+   Cada vacante trae su lista de preguntas desde admin.html. Tipos:
+   texto (respuesta abierta), sino (Sí/No), opciones, ingles (nivel) y salario.
+   Las vacantes creadas antes de este cambio usan las 5 preguntas de siempre. */
+const TIPOS = ["texto", "sino", "opciones", "ingles", "salario"];
+function preguntasPorDefecto(v){
+  const ps = [
+    { id: "exp", tipo: "texto", texto: "Cuéntanos sobre tu experiencia relacionada con este rol", ayuda: "Puedes mencionar cargos, funciones, herramientas o logros.", min: MIN_CARACTERES, palabras: arr(v.palabrasClave) },
+    { id: "full", tipo: "sino", texto: "¿Tienes disponibilidad de tiempo completo?", ayuda: "", pasa: "Sí" },
+    { id: "viaje", tipo: "sino", texto: "¿Tienes algún viaje planeado próximamente?", ayuda: "", pasa: "No" }
+  ];
+  if(v.inglesMin !== "ninguno") ps.push({ id: "ingles", tipo: "ingles", texto: "¿Cuál es tu nivel de inglés?", ayuda: "Elige el que mejor te describa.", min: NIVELES_REQ.includes(v.inglesMin) ? v.inglesMin : "B2+" });
+  ps.push({ id: "salario", tipo: "salario", texto: "¿Cuál es tu expectativa salarial?", ayuda: "", tope: v.salarioMax, moneda: v.monedaSalarioMax });
+  return ps;
+}
+function normPregunta(p, i){
+  p = p || {};
+  const tipo = TIPOS.includes(p.tipo) ? p.tipo : "texto";
+  const q = { id: String(p.id || ("q" + i)), tipo, texto: String(p.texto || "").trim(), ayuda: String(p.ayuda || "").trim() };
+  if(tipo === "texto"){
+    q.min = Math.max(0, Math.min(500, parseInt(p.min, 10) || 0));
+    q.palabras = arr(p.palabras).map(k => norm(String(k)).trim()).filter(Boolean);
+  } else if(tipo === "sino"){
+    q.pasa = ["Sí", "No"].includes(p.pasa) ? p.pasa : "cualquiera";
+  } else if(tipo === "opciones"){
+    q.opciones = arr(p.opciones).map(x => String(x).trim()).filter(Boolean);
+    q.aprobadas = arr(p.aprobadas).map(String).filter(x => q.opciones.includes(x));
+  } else if(tipo === "ingles"){
+    q.min = NIVELES_REQ.includes(p.min) ? p.min : "B2+";
+  } else if(tipo === "salario"){
+    q.tope = Number(String(p.tope == null ? "" : p.tope).replace(/\D/g, "")) || 0;
+    q.moneda = MONEDAS.some(m => m.code === p.moneda) ? p.moneda : "COP";
+  }
+  return q;
+}
+const preguntaValida = q => q.texto && (q.tipo !== "opciones" || q.opciones.length >= 2);
+function pasaPregunta(q, r){
+  if(q.tipo === "texto"){
+    const t = norm(String(r || ""));
+    return t.trim().length >= q.min && (q.palabras.length === 0 || q.palabras.some(k => t.includes(k)));
+  }
+  if(q.tipo === "sino") return q.pasa === "cualquiera" || r === q.pasa;
+  if(q.tipo === "opciones") return q.aprobadas.length === 0 || q.aprobadas.includes(r);
+  if(q.tipo === "ingles") return q.min === "ninguno" || nivelIdx(r) >= nivelIdx(q.min);
+  if(q.tipo === "salario"){
+    const pide = Number(String((r && r.monto) || "").replace(/\D/g, "")) || 0;
+    return !(q.tope > 0 && r && r.moneda === q.moneda && pide > q.tope);
+  }
+  return true;
+}
+function textoRespuesta(q, r){
+  if(q.tipo === "salario") return r && r.monto ? `${r.moneda} ${fmtMonto(r.monto)}` : "";
+  return String(r == null ? "" : r).trim();
+}
 
 /* ============================================================ */
 const $app = document.getElementById("app");
@@ -239,6 +293,7 @@ function normalizar(v){
     salarioMax: Number(String(v.salarioMax == null ? "" : v.salarioMax).replace(/\D/g, "")) || 0,
     monedaSalarioMax: MONEDAS.some(m => m.code === v.monedaSalarioMax) ? v.monedaSalarioMax : "COP",
     linkAgenda: /^https:\/\//i.test(v.linkAgenda || "") ? esc(v.linkAgenda) : "",
+    preguntas: (arr(v.preguntas).length ? arr(v.preguntas) : preguntasPorDefecto(v)).map(normPregunta).filter(preguntaValida),
     reclutadores: [
       { nombre: esc(v.rec1Nombre) || "Reclutador 1", link: v.linkAgenda },
       { nombre: esc(v.rec2Nombre) || "Reclutador 2", link: v.rec2Link },
@@ -281,7 +336,7 @@ const hasTema = (id, v) => ({
   etapas: arr(v.etapas).length > 0 || !!v.tiempos
 }[id]);
 
-let state = { view: "home", vacId: null, tema: null, step: 0, ans: { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: "COP" }, datos: { nombre: "", correo: "" }, err: "" };
+let state = { view: "home", vacId: null, tema: null, step: 0, ans: {}, moneda: "COP", datos: { nombre: "", correo: "" }, err: "" };
 
 const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
 const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
@@ -339,7 +394,7 @@ function vVac(){
     ${temas.length ? `<h2 style="margin-top:28px">Conoce más</h2>
       <div class="topics">${temas.map(t => `<button class="topic" data-a="chip" data-id="${t}" aria-pressed="false">${TEMAS[t].titulo}</button>`).join("")}</div>
       <div class="topic-panel" id="topicPanel" hidden aria-live="polite"></div>` : ""}
-    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>Si tu respuesta es sí, te haremos ${nPreg(v)} preguntas rápidas para saber si puedes agendar entrevista.</p>
+    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>${nPreg(v) === 0 ? "Si tu respuesta es sí, solo te pediremos tus datos de contacto." : nPreg(v) === 1 ? "Si tu respuesta es sí, te haremos 1 pregunta rápida para saber si puedes agendar entrevista." : `Si tu respuesta es sí, te haremos ${nPreg(v)} preguntas rápidas para saber si puedes agendar entrevista.`}</p>
       <div class="actions" style="margin-top:16px">
         <button class="btn solid" data-a="filtro">Sí, me interesa</button>
         <button class="btn" data-a="no-interes">No por ahora</button>
@@ -357,7 +412,7 @@ function vConsent(){
   const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
   return `<div class="swap">${back("vac-page","Volver a la vacante")}
     <h1 tabindex="-1">Antes de empezar</h1>
-    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro: experiencia, disponibilidad, viajes${(vacById(state.vacId) || {}).inglesMin === "ninguno" ? "" : ", nivel de inglés"} y expectativa salarial.</p>
+    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro.</p>
     <div class="sheet" style="padding:20px">
       <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. Solo el equipo de reclutamiento puede consultarla.</p>
       <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
@@ -389,67 +444,54 @@ function progress(){
           <p class="stepno">Pregunta ${state.step + 1} de ${n}</p>`;
 }
 
+const preguntaActual = () => arr((vacById(state.vacId) || {}).preguntas)[state.step];
+
 function vPregunta(){
-  const s = state.step, a = state.ans;
+  const s = state.step, q = preguntaActual(), r = state.ans[q.id];
   const prev = s === 0 ? back("vac-page","Volver a la vacante") : back("prev","Pregunta anterior");
-  const yn = key => `<div class="choices two">
-      <button class="btn" data-a="ans" data-k="${key}" data-v="Sí" aria-pressed="${a[key] === "Sí"}">Sí</button>
-      <button class="btn" data-a="ans" data-k="${key}" data-v="No" aria-pressed="${a[key] === "No"}">No</button></div>`;
+  const lead = q.ayuda ? `<p class="lead" style="margin-bottom:16px">${esc(q.ayuda)}</p>` : `<p class="lead" style="margin-bottom:16px">&nbsp;</p>`;
+  const titulo = `<h1 tabindex="-1">${esc(q.texto)}</h1>`;
+  const opcion = val => `<button class="btn" data-a="ans" data-v="${esc(val)}" aria-pressed="${r === val}">${esc(val)}</button>`;
+  const err = state.err ? `<div class="err" role="alert">${state.err}</div>` : "";
   let body = "";
-  if(s === 0){
-    body = `<h1 tabindex="-1">Cuéntanos sobre tu experiencia relacionada con este rol</h1>
-      <p class="lead" style="margin-bottom:16px">Puedes mencionar cargos, funciones, herramientas o logros.</p>
-      <label for="exp" class="hint" style="display:block;margin:0 0 8px">Tu respuesta</label>
-      <textarea id="exp" maxlength="1200">${a.exp}</textarea>
-      ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
+  if(q.tipo === "texto"){
+    body = `${titulo}${lead}
+      <label for="txt" class="hint" style="display:block;margin:0 0 8px">Tu respuesta</label>
+      <textarea id="txt" maxlength="1200">${esc(r || "")}</textarea>
+      ${err}
       <div class="actions"><button class="btn solid" data-a="next">Continuar</button></div>`;
-  } else if(s === 1){
-    body = `<h1 tabindex="-1">¿Tienes disponibilidad de tiempo completo?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("full")}`;
-  } else if(s === 2){
-    body = `<h1 tabindex="-1">¿Tienes algún viaje planeado próximamente?</h1><p class="lead" style="margin-bottom:16px">&nbsp;</p>${yn("viaje")}`;
-  } else if(s < nPreg(vacById(state.vacId)) - 1){
-    body = `<h1 tabindex="-1">¿Cuál es tu nivel de inglés?</h1><p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>
-      <div class="choices">${NIVELES_INGLES.map(n => `<button class="btn" data-a="ans" data-k="ingles" data-v="${n}" aria-pressed="${a.ingles === n}">${n}</button>`).join("")}</div>`;
+  } else if(q.tipo === "sino"){
+    body = `${titulo}${lead}<div class="choices two">${opcion("Sí")}${opcion("No")}</div>`;
+  } else if(q.tipo === "opciones"){
+    body = `${titulo}${lead}<div class="choices">${q.opciones.map(opcion).join("")}</div>`;
+  } else if(q.tipo === "ingles"){
+    body = `${titulo}${q.ayuda ? lead : `<p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>`}<div class="choices">${NIVELES_INGLES.map(opcion).join("")}</div>`;
   } else {
-    const v = vacById(state.vacId);
-    const monedaFija = v && v.salarioMax > 0;
-    body = `<h1 tabindex="-1">¿Cuál es tu expectativa salarial?</h1>
+    const monedaFija = q.tope > 0;
+    const monto = r && r.monto ? r.monto : "";
+    body = `${titulo}
+      ${q.ayuda ? `<p class="lead" style="margin-bottom:8px">${esc(q.ayuda)}</p>` : ""}
       ${monedaFija
-        ? `<p class="lead" style="margin-bottom:8px">Esta vacante evalúa el salario en <strong>${monedaInfo(v.monedaSalarioMax).label}</strong>. Escribe tu expectativa mensual en esa moneda.</p>`
-        : `<p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>
+        ? `<p class="lead" style="margin-bottom:8px">Esta vacante evalúa el salario en <strong>${monedaInfo(q.moneda).label}</strong>. Escribe tu expectativa mensual en esa moneda.</p>`
+        : `${q.ayuda ? "" : `<p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>`}
       <label class="fld" for="moneda">Moneda</label>
-      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${a.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>`}
-      <label class="fld" for="salario">Expectativa salarial mensual${monedaFija ? ` (${v.monedaSalarioMax})` : ""}</label>
-      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtMonto(a.salario)}">
-      ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
-      <div class="actions"><button class="btn solid" data-a="salario-ok">Enviar mis respuestas</button></div>`;
+      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${state.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>`}
+      <label class="fld" for="salario">Expectativa salarial mensual${monedaFija ? ` (${q.moneda})` : ""}</label>
+      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtMonto(monto)}">
+      ${err}
+      <div class="actions"><button class="btn solid" data-a="salario-ok">${s === nPreg(vacById(state.vacId)) - 1 ? "Enviar mis respuestas" : "Continuar"}</button></div>`;
   }
   return `<div class="swap">${prev}${progress()}${body}
     <p class="note">${ENDPOINT ? "Guardamos tus respuestas junto con tu nombre y correo para el proceso de selección." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
 }
 
-function evaluarCodigos(){
-  const v = vacById(state.vacId), a = state.ans, f = [];
-  const texto = norm(a.exp), kw = arr(v.palabrasClave);
-  const relacionada = texto.length >= MIN_CARACTERES && (kw.length === 0 || kw.some(k => texto.includes(k)));
-  if(!relacionada) f.push("exp");
-  if(a.full !== "Sí") f.push("full");
-  if(a.viaje !== "No") f.push("viaje");
-  if(!inglesOk(v, a.ingles)) f.push("ingles");
-  const pide = Number(String(a.salario || "").replace(/\D/g, "")) || 0;
-  if(v.salarioMax > 0 && a.moneda === v.monedaSalarioMax && pide > v.salarioMax) f.push("salario");
-  return f;
+function preguntasFallidas(){
+  const v = vacById(state.vacId);
+  return arr(v.preguntas).filter(q => !pasaPregunta(q, state.ans[q.id]));
 }
-const MOTIVOS = {
-  exp: "Tu experiencia descrita no parece relacionada con las funciones de esta vacante.",
-  full: "Esta vacante requiere disponibilidad de tiempo completo.",
-  viaje: "Por ahora buscamos personas sin viajes planeados en el corto plazo.",
-  ingles: "Esta vacante requiere un nivel de inglés B2+ o superior.",
-  salario: "Tu expectativa salarial está por encima del rango de esta vacante."
-};
 
 function vResultado(){
-  const apto = evaluarCodigos().length === 0;
+  const apto = preguntasFallidas().length === 0;
   if(apto){
     const v0 = vacById(state.vacId) || {};
     const recs = arr(v0.reclutadores);
@@ -489,23 +531,38 @@ function render(){
   const h1 = $app.querySelector("h1");
   if(h1){ h1.focus({ preventScroll: true }); }
   window.scrollTo({ top: 0 });
-  if(state.view === "pregunta" && state.step === 0){
-    const t = document.getElementById("exp");
-    if(t) t.addEventListener("input", e => { state.ans.exp = e.target.value; });
-  }
 }
 
 function finalizar(){
-  const f = evaluarCodigos(), v = vacById(state.vacId), a = state.ans;
+  const v = vacById(state.vacId), a = state.ans, ps = arr(v.preguntas);
+  const fallidas = preguntasFallidas();
+  const primera = tipo => ps.find(q => q.tipo === tipo);
+  const resp = q => q ? textoRespuesta(q, a[q.id]) : "";
+  const pIngles = primera("ingles"), pSal = primera("salario");
+  const pExp = ps.find(q => q.id === "exp") || primera("texto");
+  const sal = pSal ? (a[pSal.id] || {}) : {};
   state.view = "resultado"; render();
-  enviarResultado({ tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw, pasa: f.length === 0, fallas: f, tiempoCompleto: a.full, viaje: a.viaje, ingles: a.ingles || "No aplica", nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: a.exp.trim(), expectativaSalarial: Number(String(a.salario || "").replace(/\D/g, "")) || 0, monedaSalarial: a.moneda });
+  enviarResultado({
+    tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw,
+    pasa: fallidas.length === 0, fallas: fallidas.map(q => q.texto.length > 80 ? q.texto.slice(0, 77) + "…" : q.texto),
+    respuestas: ps.map(q => ({ pregunta: q.texto, respuesta: resp(q) })),
+    tiempoCompleto: resp(ps.find(q => q.id === "full")), viaje: resp(ps.find(q => q.id === "viaje")),
+    ingles: pIngles ? resp(pIngles) : "No aplica",
+    nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: resp(pExp),
+    expectativaSalarial: Number(String(sal.monto || "").replace(/\D/g, "")) || 0, monedaSalarial: sal.moneda || ""
+  });
 }
 
 function reiniciarFiltro(){
   const v = vacById(state.vacId);
-  state.step = 0; state.err = "";
-  state.ans = { exp: "", full: null, viaje: null, ingles: null, salario: "", moneda: (v && v.salarioMax > 0) ? v.monedaSalarioMax : "COP" };
+  const pSal = arr(v && v.preguntas).find(q => q.tipo === "salario");
+  state.step = 0; state.err = ""; state.ans = {};
+  state.moneda = pSal && pSal.tope > 0 ? pSal.moneda : "COP";
   state.datos = { nombre: "", correo: "" };
+}
+
+function avanzar(){
+  if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else { finalizar(); }
 }
 
 $app.addEventListener("click", e => {
@@ -529,7 +586,9 @@ $app.addEventListener("click", e => {
     const n = state.datos.nombre.trim(), c = state.datos.correo.trim();
     if(n.length < 3){ state.err = "Escribe tu nombre completo."; return render(); }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c)){ state.err = "Escribe un correo válido, por ejemplo nombre@correo.com."; return render(); }
-    state.err = ""; state.step = 0; state.view = "pregunta"; render();
+    state.err = ""; state.step = 0;
+    if(nPreg(vacById(state.vacId)) === 0) return finalizar();
+    state.view = "pregunta"; render();
   }
   else if(act === "no-acepto"){ state.view = "nointeres"; render(); }
   else if(act === "no-interes"){
@@ -539,24 +598,28 @@ $app.addEventListener("click", e => {
   }
   else if(act === "prev"){ state.step = Math.max(0, state.step - 1); state.err = ""; render(); }
   else if(act === "next"){
-    const txt = (document.getElementById("exp") || {}).value || state.ans.exp;
-    state.ans.exp = txt;
-    if(txt.trim().length < MIN_CARACTERES){ state.err = "Cuéntanos un poco más para poder evaluar tu perfil."; return render(); }
-    state.err = ""; state.step = 1; render();
+    const q = preguntaActual();
+    const txt = ((document.getElementById("txt") || {}).value || state.ans[q.id] || "");
+    state.ans[q.id] = txt;
+    const minimo = Math.max(1, q.min);
+    if(txt.trim().length < minimo){ state.err = minimo > 1 ? "Cuéntanos un poco más para poder evaluar tu perfil." : "Escribe tu respuesta para continuar."; return render(); }
+    state.err = ""; avanzar();
   }
   else if(act === "ans"){
-    state.ans[el.dataset.k] = el.dataset.v;
-    if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else { finalizar(); }
+    state.ans[preguntaActual().id] = el.dataset.v;
+    avanzar();
   }
   else if(act === "salario-ok"){
+    const q = preguntaActual();
     const inp = document.getElementById("salario");
-    const digitos = ((inp ? inp.value : state.ans.salario) || "").replace(/\D/g, "");
-    state.ans.salario = digitos;
+    const digitos = ((inp ? inp.value : "") || "").replace(/\D/g, "");
+    const moneda = q.tope > 0 ? q.moneda : state.moneda;
+    state.ans[q.id] = { monto: digitos, moneda };
     const n = Number(digitos);
-    const m = monedaInfo(state.ans.moneda);
+    const m = monedaInfo(moneda);
     if(!(n >= m.min && n <= m.max)){ state.err = `Escribe tu expectativa mensual completa en ${m.code}, por ejemplo ${m.ejemplo}.`; return render(); }
     state.err = "";
-    finalizar();
+    avanzar();
   }
 });
 
@@ -565,13 +628,14 @@ $app.addEventListener("input", e => {
   if(e.target.id === "correo") state.datos.correo = e.target.value;
   if(e.target.id === "salario"){
     const d = e.target.value.replace(/\D/g, "").slice(0, 10);
-    state.ans.salario = d; e.target.value = fmtMonto(d);
+    e.target.value = fmtMonto(d);
   }
+  if(e.target.id === "txt"){ const q = preguntaActual(); if(q) state.ans[q.id] = e.target.value; }
 });
 
 $app.addEventListener("change", e => {
   if(e.target.id === "okDatos"){ document.getElementById("btnAcepto").disabled = !e.target.checked; }
-  if(e.target.id === "moneda") state.ans.moneda = e.target.value;
+  if(e.target.id === "moneda") state.moneda = e.target.value;
 });
 
 render();
