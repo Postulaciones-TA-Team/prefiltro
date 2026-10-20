@@ -70,6 +70,14 @@
   details p{margin:8px 0 0; font-size:15px}
   .linkback{background:none; border:0; padding:6px 0; font:inherit; font-weight:600; color:var(--muted); cursor:pointer}
   .linkback:hover{color:var(--accent)}
+  .qcard{background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:14px 16px 16px; margin-top:12px}
+  .qhead{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap}
+  .qhead strong{font-family:var(--display); font-size:16px}
+  .qcard label{margin-top:12px}
+  .chk{display:flex; align-items:center; gap:10px; font-weight:400; margin:8px 0 0; cursor:pointer}
+  .chk input{width:20px; height:20px; accent-color:var(--accent)}
+  .qadd{display:flex; gap:10px; margin-top:14px; flex-wrap:wrap}
+  .qadd select{flex:1; min-width:180px}
 </style>
 </head>
 <body>
@@ -155,7 +163,148 @@ async function guardarVacante(v){
   return { ok: false, razon: "El cambio no aparece todavía en la hoja, así que no podemos confirmarlo. Abre la pestaña «Vacantes»: si el cambio está, sí se guardó y basta con actualizar esta página. Si no está, vuelve a intentarlo." };
 }
 
-const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [], salarioMax: "", monedaSalarioMax: "COP", rec1Nombre: "", rec2Nombre: "", rec2Link: "", rec3Nombre: "", rec3Link: "" });
+const vacio = () => ({ id: "", estado: "Activa", nombre: "", descripcion: "", sedes: [], salario: "", beneficios: [], horario: "", modalidad: "", etapas: [], tiempos: "", requisitos: [], palabrasClave: [], linkAgenda: "", inglesMin: "B2+", responsabilidades: [], salarioMax: "", monedaSalarioMax: "COP", rec1Nombre: "", rec2Nombre: "", rec2Link: "", rec3Nombre: "", rec3Link: "", preguntas: preguntasPorDefecto({}) });
+
+/* ---------- Preguntas del prefiltro ---------- */
+const TIPOS_PREG = [
+  ["texto", "Respuesta abierta"],
+  ["sino", "Sí / No"],
+  ["opciones", "Opción múltiple"],
+  ["ingles", "Nivel de inglés"],
+  ["salario", "Expectativa salarial"]
+];
+const tipoNombre = t => (TIPOS_PREG.find(x => x[0] === t) || TIPOS_PREG[0])[1];
+const UNICOS = ["ingles", "salario"]; // solo puede haber una de cada una por vacante
+const idPregunta = () => "q" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const listaTxt = x => Array.isArray(x) ? x.map(String).filter(Boolean) : [];
+
+// Las vacantes creadas antes de este cambio usan estas 5 preguntas (las mismas que veía el candidato).
+function preguntasPorDefecto(v){
+  const ps = [
+    { id: "exp", tipo: "texto", texto: "Cuéntanos sobre tu experiencia relacionada con este rol", ayuda: "Puedes mencionar cargos, funciones, herramientas o logros.", min: 25, palabras: listaTxt(v.palabrasClave) },
+    { id: "full", tipo: "sino", texto: "¿Tienes disponibilidad de tiempo completo?", ayuda: "", pasa: "Sí" },
+    { id: "viaje", tipo: "sino", texto: "¿Tienes algún viaje planeado próximamente?", ayuda: "", pasa: "No" }
+  ];
+  if(v.inglesMin !== "ninguno") ps.push({ id: "ingles", tipo: "ingles", texto: "¿Cuál es tu nivel de inglés?", ayuda: "Elige el que mejor te describa.", min: ["B2","B2+","C1","Nativo"].includes(v.inglesMin) ? v.inglesMin : "B2+" });
+  ps.push({ id: "salario", tipo: "salario", texto: "¿Cuál es tu expectativa salarial?", ayuda: "", tope: String(v.salarioMax || "").replace(/\D/g, ""), moneda: v.monedaSalarioMax || "COP" });
+  return ps;
+}
+
+function preguntaNueva(tipo){
+  const base = { id: idPregunta(), tipo, texto: "", ayuda: "" };
+  if(tipo === "texto") return Object.assign(base, { min: 0, palabras: [] });
+  if(tipo === "sino") return Object.assign(base, { pasa: "Sí" });
+  if(tipo === "opciones") return Object.assign(base, { opciones: [], aprobadas: [] });
+  if(tipo === "ingles") return Object.assign(base, { texto: "¿Cuál es tu nivel de inglés?", ayuda: "Elige el que mejor te describa.", min: "B2+" });
+  return Object.assign(base, { tipo: "salario", texto: "¿Cuál es tu expectativa salarial?", tope: "", moneda: "COP" });
+}
+
+function opcionesTipo(actual, i){
+  const usados = (editando.preguntas || []).filter((q, j) => j !== i).map(q => q.tipo);
+  return TIPOS_PREG.map(([k, t]) => {
+    const bloqueado = UNICOS.includes(k) && usados.includes(k);
+    return `<option value="${k}" ${actual === k ? "selected" : ""} ${bloqueado ? "disabled" : ""}>${t}${bloqueado ? " (ya existe)" : ""}</option>`;
+  }).join("");
+}
+
+function configPregunta(q, i){
+  if(q.tipo === "texto") return `
+    <label for="qmin_${i}">Mínimo de caracteres</label>
+    <input type="text" id="qmin_${i}" inputmode="numeric" value="${esc(q.min || 0)}">
+    <p class="hint">El candidato no puede continuar con menos de esto. Pon 0 si basta con que escriba algo.</p>
+    <label for="qpal_${i}">Palabras clave (opcional)</label>
+    <input type="text" id="qpal_${i}" value="${esc(listaTxt(q.palabras).join(", "))}" placeholder="bpo, clientes, kpis">
+    <p class="hint">Separadas por coma. Si pones palabras, la respuesta debe mencionar al menos una para pasar el filtro.</p>`;
+  if(q.tipo === "sino") return `
+    <label for="qpasa_${i}">Pasa el filtro si responde</label>
+    <select id="qpasa_${i}">${[["Sí","Sí"],["No","No"],["cualquiera","Cualquiera (solo informativa)"]].map(([k, t]) => `<option value="${k}" ${(q.pasa || "cualquiera") === k ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  if(q.tipo === "opciones"){
+    const ops = listaTxt(q.opciones), ap = listaTxt(q.aprobadas);
+    return `
+    <label for="qop_${i}">Opciones</label>
+    <textarea id="qop_${i}" data-qop="${i}" placeholder="Una por línea">${esc(ops.join("\n"))}</textarea>
+    <p class="hint">Una por línea, mínimo 2.</p>
+    ${ops.length ? `<p style="font-weight:600;font-size:14px;margin:14px 0 0">¿Cuáles pasan el filtro?</p>
+      ${ops.map(o => `<label class="chk"><input type="checkbox" data-ap="${i}" value="${esc(o)}" ${ap.includes(o) ? "checked" : ""}>${esc(o)}</label>`).join("")}
+      <p class="hint">Si no marcas ninguna, todas pasan.</p>` : ""}`;
+  }
+  if(q.tipo === "ingles") return `
+    <label for="qing_${i}">Nivel mínimo para pasar</label>
+    <select id="qing_${i}">${[["B2","B2 o superior"],["B2+","B2+ o superior"],["C1","C1 o superior"],["Nativo","Nativo"]].map(([k, t]) => `<option value="${k}" ${(q.min || "B2+") === k ? "selected" : ""}>${t}</option>`).join("")}</select>
+    <p class="hint">El candidato elige entre: A1 a B1, B2, B2+, C1 y Nativo.</p>`;
+  return `
+    <label for="qtope_${i}">Tope de expectativa salarial (opcional)</label>
+    <div style="display:flex;gap:10px">
+      <input type="text" id="qtope_${i}" data-monto="1" inputmode="numeric" value="${esc(fmtMonto(q.tope))}" placeholder="7.000.000" style="flex:2">
+      <select id="qmon_${i}" style="flex:1">${MONEDAS.map(m => `<option value="${m.code}" ${(q.moneda || "COP") === m.code ? "selected" : ""}>${m.code}</option>`).join("")}</select>
+    </div>
+    <p class="hint">Si pide más que este monto en la MISMA moneda, queda «En revisión». Si elige otra moneda no se evalúa (no hay conversión). Déjalo vacío para no filtrar por salario.</p>`;
+}
+
+function editorPreguntas(){
+  const ps = editando.preguntas || [];
+  const usados = ps.map(q => q.tipo);
+  return `<h2 style="margin-top:32px">Preguntas del prefiltro</h2>
+    <p class="hint" style="margin-top:0">Es lo que responde el candidato, en este orden. Si no pasa alguna, queda «En revisión» y no recibe el link de agendamiento automáticamente.</p>
+    ${ps.map((q, i) => `<div class="qcard">
+      <div class="qhead"><strong>Pregunta ${i + 1}</strong>
+        <div class="btns">
+          <button class="btn small" data-a="q-up" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Subir pregunta ${i + 1}">↑</button>
+          <button class="btn small" data-a="q-down" data-i="${i}" ${i === ps.length - 1 ? "disabled" : ""} aria-label="Bajar pregunta ${i + 1}">↓</button>
+          <button class="btn small" data-a="q-del" data-i="${i}">Quitar</button>
+        </div></div>
+      <label for="qtipo_${i}">Tipo</label>
+      <select id="qtipo_${i}" data-qtipo="${i}">${opcionesTipo(q.tipo, i)}</select>
+      <label for="qt_${i}">Pregunta *</label>
+      <input type="text" id="qt_${i}" value="${esc(q.texto)}" placeholder="Ej: ¿Tienes experiencia en ventas?">
+      <label for="qa_${i}">Texto de ayuda (opcional)</label>
+      <input type="text" id="qa_${i}" value="${esc(q.ayuda)}" placeholder="Aparece debajo de la pregunta">
+      ${configPregunta(q, i)}
+    </div>`).join("")}
+    ${ps.length ? "" : `<div class="msg err">Agrega al menos una pregunta.</div>`}
+    <div class="qadd">
+      <select id="q_nuevo" aria-label="Tipo de la pregunta nueva">${TIPOS_PREG.map(([k, t]) => `<option value="${k}" ${UNICOS.includes(k) && usados.includes(k) ? "disabled" : ""}>${t}${UNICOS.includes(k) && usados.includes(k) ? " (ya existe)" : ""}</option>`).join("")}</select>
+      <button class="btn small solid" data-a="q-add">Agregar pregunta</button>
+    </div>`;
+}
+
+function leerPreguntas(){
+  const hay = id => !!document.getElementById(id);
+  return (editando.preguntas || []).map((q, i) => {
+    if(!hay("qt_" + i)) return q;
+    const tipo = val("qtipo_" + i) || q.tipo;
+    const cambio = tipo !== q.tipo;
+    const n = cambio ? Object.assign(preguntaNueva(tipo), { id: q.id }) : Object.assign({}, q);
+    n.texto = val("qt_" + i).trim();
+    n.ayuda = val("qa_" + i).trim();
+    if(cambio) return n;
+    if(tipo === "texto"){
+      n.min = Math.max(0, Math.min(500, parseInt(val("qmin_" + i), 10) || 0));
+      n.palabras = val("qpal_" + i).split(",").map(x => quitaTildes(x.trim().toLowerCase())).filter(Boolean);
+    } else if(tipo === "sino"){
+      n.pasa = val("qpasa_" + i) || "cualquiera";
+    } else if(tipo === "opciones"){
+      n.opciones = [...new Set(lineas("qop_" + i))];
+      const marcadas = [...document.querySelectorAll(`input[data-ap="${i}"]:checked`)].map(x => x.value);
+      n.aprobadas = n.opciones.filter(o => marcadas.includes(o));
+    } else if(tipo === "ingles"){
+      n.min = val("qing_" + i) || "B2+";
+    } else if(tipo === "salario"){
+      n.tope = val("qtope_" + i).replace(/\D/g, "");
+      n.moneda = val("qmon_" + i) || "COP";
+    }
+    return n;
+  });
+}
+
+// Guarda lo escrito en pantalla, aplica el cambio y redibuja sin perder la posición.
+function cambiarPreguntas(fn){
+  editando = leerForm();
+  fn(editando.preguntas);
+  const y = window.scrollY;
+  render();
+  window.scrollTo({ top: y });
+}
 const MONEDAS = [
   { code: "COP", label: "COP - Pesos colombianos" },
   { code: "USD", label: "USD - Dólares" },
@@ -256,12 +405,6 @@ function vForm(){
     ${campoLista("f_sedes", "Sedes / ciudades", v.sedes, "Una por línea. Ej: Medellín (Edificio Camacol)")}
     <label for="f_salario">Salario</label>
     <input type="text" id="f_salario" value="${esc(v.salario)}" placeholder="$7.000.000 COP">
-    <label for="f_salarioMax">Tope de expectativa salarial (opcional)</label>
-    <div style="display:flex;gap:10px">
-      <input type="text" id="f_salarioMax" inputmode="numeric" value="${esc(fmtMonto(v.salarioMax))}" placeholder="7.000.000" style="flex:2">
-      <select id="f_monedaSalarioMax" style="flex:1">${MONEDAS.map(m => `<option value="${m.code}" ${(v.monedaSalarioMax || "COP") === m.code ? "selected" : ""}>${m.code}</option>`).join("")}</select>
-    </div>
-    <p class="hint">Si el candidato pide más que este monto en la MISMA moneda, queda «En revisión» y no recibe el link automáticamente. Si elige otra moneda, el prefiltro no evalúa el salario (no hay conversión automática). Deja el monto vacío para no evaluar el salario en esta vacante.</p>
     ${campoLista("f_beneficios", "Beneficios", v.beneficios, "Uno por línea.")}
     <label for="f_horario">Horario</label>
     <input type="text" id="f_horario" value="${esc(v.horario)}" placeholder="Lunes a viernes, 8:00 a.m. a 6:00 p.m.">
@@ -271,14 +414,7 @@ function vForm(){
     <label for="f_tiempos">Tiempos estimados</label>
     <input type="text" id="f_tiempos" value="${esc(v.tiempos)}" placeholder="1 a 2 semanas">
     ${campoLista("f_requisitos", "Requisitos", v.requisitos, "Uno por línea.")}
-    <label for="f_palabrasClave">Palabras clave de experiencia</label>
-    <input type="text" id="f_palabrasClave" value="${esc((v.palabrasClave || []).join(", "))}" placeholder="bpo, clientes, kpis, supervisores">
-    <p class="hint">Separadas por coma. El prefiltro las busca en la respuesta de experiencia del candidato. Si las dejas vacías, solo revisa que la respuesta tenga suficiente texto.</p>
-    <label for="f_inglesMin">Nivel de inglés requerido</label>
-    <select id="f_inglesMin">
-      ${[["ninguno","No se requiere inglés"],["B2","B2 o superior"],["B2+","B2+ o superior"],["C1","C1 o superior"],["Nativo","Nativo"]].map(([k,t]) => `<option value="${k}" ${(v.inglesMin || "B2+") === k ? "selected" : ""}>${t}</option>`).join("")}
-    </select>
-    <p class="hint">Si eliges «No se requiere inglés», el prefiltro no le hace esa pregunta al candidato.</p>
+    ${editorPreguntas()}
     <h2 style="margin-top:28px">Reclutadores para agendar</h2>
     <p class="hint" style="margin-top:0">Hasta 3 reclutadores trabajando esta vacante. El candidato verá el nombre de cada uno y podrá elegir con quién agendar. Deja el link vacío en los que no uses.</p>
     <label for="f_rec1Nombre">Reclutador 1 — nombre</label>
@@ -368,10 +504,12 @@ function vPostulantes(){
         <span class="chip ${p.estado === "Apto" ? "on" : "off"}">${esc(p.estado)}</span></div>
         <p class="hint" style="margin-top:8px">${esc(isNaN(new Date(p.fecha)) ? p.fecha : new Date(p.fecha).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }))}, ${esc(p.vacante)}</p>
         <details><summary>Ver respuestas</summary>
-          <p><strong>Tiempo completo:</strong> ${esc(p.tiempoCompleto)}. <strong>Viaje planeado:</strong> ${esc(p.viaje)}. <strong>Inglés:</strong> ${esc(p.ingles)}.</p>
           ${p.fallas ? `<p><strong>No cumple:</strong> ${esc(p.fallas)}</p>` : ""}
+          ${p.respuestas
+            ? p.respuestas.split("\n").filter(Boolean).map(l => { const k = l.indexOf(" → "); return k > 0 ? `<p><strong>${esc(l.slice(0, k))}</strong><br>${esc(l.slice(k + 3))}</p>` : `<p>${esc(l)}</p>`; }).join("")
+            : `<p><strong>Tiempo completo:</strong> ${esc(p.tiempoCompleto)}. <strong>Viaje planeado:</strong> ${esc(p.viaje)}. <strong>Inglés:</strong> ${esc(p.ingles)}.</p>
           <p><strong>Expectativa salarial:</strong> ${p.expectativa ? esc(p.moneda || "COP") + " " + esc(fmtMonto(p.expectativa)) : "sin dato"}${(() => { const vv = lista.find(x => x.nombre === p.vacante); return vv && vv.salarioMax ? " (tope de la vacante: " + esc(vv.monedaSalarioMax || "COP") + " " + esc(fmtMonto(vv.salarioMax)) + ")" : ""; })()}</p>
-          <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p></details>
+          <p><strong>Experiencia:</strong> ${esc(p.experiencia)}</p>`}</details>
         ${accionesPostulante(p)}</div>`).join("");
   return `<button class="linkback" data-a="volver-lista">← Volver a las vacantes</button>
     <h1 tabindex="-1">Postulantes</h1>
@@ -405,11 +543,16 @@ function leerForm(){
   v.etapas = lineas("f_etapas");
   v.tiempos = val("f_tiempos").trim();
   v.requisitos = lineas("f_requisitos");
-  v.palabrasClave = val("f_palabrasClave").split(",").map(x => quitaTildes(x.trim().toLowerCase())).filter(Boolean);
-  v.inglesMin = val("f_inglesMin") || "B2+";
+  v.preguntas = leerPreguntas();
+  // Se copian a los campos de siempre para que el resto del panel (y el script) los sigan viendo
+  const ps = v.preguntas;
+  const pExp = ps.find(q => q.id === "exp") || ps.find(q => q.tipo === "texto");
+  const pIng = ps.find(q => q.tipo === "ingles"), pSal = ps.find(q => q.tipo === "salario");
+  v.palabrasClave = pExp ? listaTxt(pExp.palabras) : [];
+  v.inglesMin = pIng ? pIng.min : "ninguno";
+  v.salarioMax = pSal ? String(pSal.tope || "") : "";
+  v.monedaSalarioMax = pSal ? (pSal.moneda || "COP") : "COP";
   v.linkAgenda = val("f_linkAgenda").trim();
-  v.salarioMax = val("f_salarioMax").replace(/\D/g, "");
-  v.monedaSalarioMax = val("f_monedaSalarioMax") || "COP";
   v.rec1Nombre = val("f_rec1Nombre").trim();
   v.rec2Nombre = val("f_rec2Nombre").trim();
   v.rec2Link = val("f_rec2Link").trim();
@@ -429,20 +572,37 @@ function guardarClave(c){ clave = c; try{ sessionStorage.setItem("clave_admin", 
 $app.addEventListener("change", e => {
   if(e.target.id === "fp_vac"){ filtroPostVac = e.target.value; render(); }
   if(e.target.id === "fp_est"){ filtroPostEst = e.target.value; render(); }
+  if(editando && (e.target.dataset.qtipo !== undefined || e.target.dataset.qop !== undefined)) cambiarPreguntas(() => {});
 });
 
 $app.addEventListener("input", e => {
   if(e.target.id === "clave" || e.target.id === "f_clave2") guardarClave(e.target.value);
   if(e.target.classList.contains("lk")) linkBorrador = e.target.value;
   if(e.target.classList.contains("bulk")) bulkBorrador = e.target.value;
-  if(e.target.id === "f_salarioMax") e.target.value = fmtMonto(e.target.value);
+  if(e.target.dataset.monto) e.target.value = fmtMonto(e.target.value);
 });
 
 $app.addEventListener("click", async e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
   const a = el.dataset.a;
   if(a === "nueva"){ editando = vacio(); mensaje = null; render(); window.scrollTo({ top: 0 }); }
-  else if(a === "editar"){ editando = Object.assign(vacio(), lista.find(x => x.id === el.dataset.id)); mensaje = null; render(); window.scrollTo({ top: 0 }); }
+  else if(a === "editar"){
+    const orig = lista.find(x => x.id === el.dataset.id) || {};
+    editando = Object.assign(vacio(), orig);
+    if(!Array.isArray(orig.preguntas) || !orig.preguntas.length) editando.preguntas = preguntasPorDefecto(orig);
+    mensaje = null; render(); window.scrollTo({ top: 0 });
+  }
+  else if(a === "q-add"){
+    const tipo = val("q_nuevo") || "texto";
+    cambiarPreguntas(ps => ps.push(preguntaNueva(tipo)));
+    const n = editando.preguntas.length - 1, campo = document.getElementById("qt_" + n);
+    if(campo){ campo.focus(); campo.scrollIntoView({ block: "center" }); }
+  }
+  else if(a === "q-del"){ const i = +el.dataset.i; cambiarPreguntas(ps => ps.splice(i, 1)); }
+  else if(a === "q-up" || a === "q-down"){
+    const i = +el.dataset.i, j = a === "q-up" ? i - 1 : i + 1;
+    cambiarPreguntas(ps => { if(j >= 0 && j < ps.length){ const t = ps[i]; ps[i] = ps[j]; ps[j] = t; } });
+  }
   else if(a === "cancelar"){ editando = null; mensaje = null; render(); }
   else if(a === "link"){
     if(!clave){ mensaje = { t: "err", x: "Escribe la clave de administrador primero." }; return render(); }
@@ -500,6 +660,11 @@ $app.addEventListener("click", async e => {
     const v = leerForm();
     editando = v; // conserva lo escrito en pantalla aunque una validación falle abajo
     if(!v.nombre){ mensaje = { t: "err", x: "Escribe el nombre de la vacante." }; return render(); }
+    if(!v.preguntas.length){ mensaje = { t: "err", x: "Agrega al menos una pregunta al prefiltro." }; return render(); }
+    const sinTexto = v.preguntas.findIndex(q => !q.texto);
+    if(sinTexto >= 0){ mensaje = { t: "err", x: `Escribe el texto de la pregunta ${sinTexto + 1}.` }; return render(); }
+    const pocas = v.preguntas.findIndex(q => q.tipo === "opciones" && listaTxt(q.opciones).length < 2);
+    if(pocas >= 0){ mensaje = { t: "err", x: `La pregunta ${pocas + 1} necesita al menos 2 opciones.` }; return render(); }
     if(v.linkAgenda && !/^https:\/\//i.test(v.linkAgenda)){ mensaje = { t: "err", x: "El link del Reclutador 1 debe empezar con https://" }; return render(); }
     if(v.rec2Link && !/^https:\/\//i.test(v.rec2Link)){ mensaje = { t: "err", x: "El link del Reclutador 2 debe empezar con https://" }; return render(); }
     if(v.rec3Link && !/^https:\/\//i.test(v.rec3Link)){ mensaje = { t: "err", x: "El link del Reclutador 3 debe empezar con https://" }; return render(); }
@@ -510,10 +675,10 @@ $app.addEventListener("click", async e => {
     const res = await guardarVacante(v);
     if(res.ok){
       const g = lista.find(x => x.id === v.id);
-      const scriptViejo = v.salarioMax && g && g.salarioMax === undefined;
+      const scriptViejo = g && g.preguntas === undefined;
       editando = null;
       mensaje = scriptViejo
-        ? { t: "err", x: "La vacante se guardó, pero el script de Google es una versión anterior y no guarda el tope salarial. Pega el apps_script.gs nuevo y publica una versión nueva." }
+        ? { t: "err", x: "La vacante se guardó, pero el script de Google es una versión anterior y no guarda las preguntas. Pega el apps_script.gs nuevo y publica una versión nueva." }
         : { t: "ok", x: "Vacante guardada. Ya aparece en la página pública si está Activa." };
     } else { mensaje = { t: "err", x: res.razon }; }
     render();
