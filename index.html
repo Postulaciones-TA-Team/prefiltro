@@ -2,204 +2,166 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Prefiltro de candidatos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#EEF2F7; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#4E5D72; --line:#D3DAE5;
+    --paper:#E9EEF6; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#4E5D72; --line:#D3DAE5;
     --accent:#1F4FFF; --accent-ink:#FFFFFF; --accent-soft:#E3EAFF;
-    --ok:#0F7B55; --ok-soft:#DDF3EA; --warn:#7A5000; --warn-soft:#FFF0CC;
+    --ok:#0F7B55; --ok-soft:#DDF3EA; --warn:#7A5000; --warn-soft:#FFF0CC; --live:#1DB954;
     --display:"Bricolage Grotesque","Trebuchet MS","Segoe UI",sans-serif;
     --body:"Public Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+      --paper:#0A111B; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
       --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
       --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
     }
   }
   :root[data-theme="dark"]{
-    --paper:#0C1420; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
+    --paper:#0A111B; --surface:#131E2D; --ink:#E8EEF7; --muted:#9FADC1; --line:#263449;
     --accent:#86A2FF; --accent-ink:#0C1420; --accent-soft:#1B2A4D;
     --ok:#5FD3A2; --ok-soft:#12332A; --warn:#F2C46B; --warn-soft:#3A2E10;
   }
-
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{
-    margin:0; background:var(--paper); color:var(--ink);
-    font-family:var(--body); font-size:16px; line-height:1.55;
-  }
-  .wrap{max-width:680px; margin:0 auto; padding:20px 20px 64px}
-  .brand{
-    display:flex; align-items:center; gap:10px; padding:6px 0 28px;
-    font-family:var(--display); font-weight:700; font-size:17px; letter-spacing:.01em;
-  }
-  .brand-mark{
-    width:28px; height:28px; border-radius:8px; background:var(--accent); color:var(--accent-ink);
-    display:grid; place-items:center; font-size:15px; font-weight:700;
-  }
-  .brand small{font-family:var(--body); font-weight:500; color:var(--muted); font-size:14px}
+  html{-webkit-text-size-adjust:100%; height:100%}
+  body{margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16px; line-height:1.5}
+  button{font:inherit; color:inherit}
+  :focus-visible{outline:3px solid var(--accent); outline-offset:2px}
 
-  h1{
-    font-family:var(--display); font-weight:700; font-size:clamp(30px,7vw,44px);
-    line-height:1.08; letter-spacing:-.02em; margin:0 0 12px;
-  }
-  h1:focus{outline:none}
-  h2{font-family:var(--display); font-weight:700; font-size:20px; line-height:1.2; margin:0 0 8px}
-  .lead{color:var(--muted); font-size:17px; max-width:52ch; margin:0 0 28px}
-  p{margin:0 0 12px}
+  .app{max-width:760px; margin:0 auto; height:100vh; height:100dvh; display:flex; flex-direction:column; background:var(--paper)}
+  @media (min-width:800px){ .app{border-left:1px solid var(--line); border-right:1px solid var(--line)} }
 
-  /* Menú */
-  .menu{list-style:none; margin:0; padding:0}
-  .menu li{border-top:1px solid var(--line)}
-  .menu li:last-child{border-bottom:1px solid var(--line)}
-  .row{
-    width:100%; display:flex; align-items:center; justify-content:space-between; gap:16px;
-    background:none; border:0; color:inherit; font:inherit; text-align:left; cursor:pointer;
-    padding:16px 4px; min-height:64px;
-  }
-  .row:hover .row-title{color:var(--accent)}
-  .row-title{font-weight:600; display:block}
-  .row-hint{color:var(--muted); font-size:14px; display:block}
-  .chev{flex:none; width:20px; height:20px; color:var(--muted)}
-  .primary-row{
-    background:var(--accent); color:var(--accent-ink); border-radius:14px; padding:18px 20px;
-    margin-bottom:22px; border:0;
-  }
-  .primary-row .row-hint{color:inherit; opacity:.85}
-  .primary-row:hover .row-title{color:inherit}
-  .primary-row .chev{color:inherit}
+  /* Encabezado */
+  .top{display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--line); position:relative}
+  .av{width:40px; height:40px; border-radius:50%; flex:none; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; position:relative}
+  .top .av::after{content:""; position:absolute; right:0; bottom:0; width:11px; height:11px; border-radius:50%; background:var(--live); border:2px solid var(--surface)}
+  .who{flex:1; min-width:0}
+  .who b{display:block; font-family:var(--display); font-size:17px; line-height:1.2}
+  .who span{font-size:13px; color:var(--muted)}
+  .iconbtn{background:none; border:1.5px solid var(--line); border-radius:999px; padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; color:var(--muted); display:inline-flex; gap:6px; align-items:center}
+  .iconbtn:hover{border-color:var(--accent); color:var(--accent)}
+  .prog{position:absolute; left:0; right:0; bottom:-1px; height:3px; background:transparent}
+  .prog i{display:block; height:100%; width:0; background:var(--accent); transition:width .35s ease}
 
-  /* Botones */
-  .btn{
-    font:inherit; font-weight:600; cursor:pointer; border-radius:12px; padding:13px 20px;
-    border:1.5px solid var(--ink); background:transparent; color:var(--ink); min-height:48px;
-  }
-  .btn:hover{background:var(--accent-soft); border-color:var(--accent)}
-  .btn.solid{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
-  .btn.solid:hover{filter:brightness(1.08)}
-  .btn[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--ink)}
-  .actions{display:flex; flex-wrap:wrap; gap:12px; margin-top:24px}
-  .linkback{
-    background:none; border:0; padding:6px 0; margin:0 0 20px; font:inherit; font-weight:600;
-    color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; gap:6px;
-  }
-  .linkback:hover{color:var(--accent)}
-  :focus-visible{outline:3px solid var(--accent); outline-offset:3px; border-radius:6px}
+  /* Conversación */
+  #log{flex:1; overflow-y:auto; padding:18px 14px 10px; scroll-behavior:smooth; overscroll-behavior:contain}
+  .day{text-align:center; font-size:12px; color:var(--muted); margin:0 0 14px}
+  .row{display:flex; align-items:flex-end; gap:8px; margin-top:14px}
+  .row.cont{margin-top:4px}
+  .row .av{width:30px; height:30px}
+  .row.cont .av{visibility:hidden}
+  .row.me{justify-content:flex-end}
+  .bubble{max-width:min(540px, 82%); padding:10px 14px; border-radius:18px; word-wrap:break-word; overflow-wrap:anywhere}
+  .bot .bubble{background:var(--surface); border:1px solid var(--line); border-bottom-left-radius:6px}
+  .bot.cont .bubble{border-top-left-radius:6px}
+  .me .bubble{background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:6px; white-space:pre-wrap}
+  .bubble p{margin:0 0 8px} .bubble p:last-child{margin:0}
+  .bubble small{display:block; color:var(--muted); font-size:14px; margin-top:4px}
+  .bubble .tt{font-family:var(--display); font-weight:700; font-size:17px; margin:0 0 6px}
+  .bubble .qn{display:inline-block; font-size:12px; font-weight:600; color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:2px 9px; margin-bottom:6px}
+  .bubble ul{margin:4px 0 0; padding-left:1.15em} .bubble li{margin-bottom:3px}
+  .bubble a{color:var(--accent); font-weight:600}
+  .bubble.wide{max-width:100%; flex:1; background:none; border:0; padding:0}
+  .bubble.ok{background:var(--ok-soft); border-color:transparent}
+  .bubble.later{background:var(--warn-soft); border-color:transparent}
+  .steps{list-style:none; margin:6px 0 0; padding:0; counter-reset:s}
+  .steps li{counter-increment:s; position:relative; padding:2px 0 12px 34px; min-height:26px}
+  .steps li::before{content:counter(s); position:absolute; left:0; top:0; width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-weight:700; font-size:12px}
+  .steps li::after{content:""; position:absolute; left:11px; top:26px; bottom:2px; width:2px; background:var(--line)}
+  .steps li:last-child{padding-bottom:0} .steps li:last-child::after{display:none}
+  .big{font-family:var(--display); font-size:22px; font-weight:700}
 
-  /* Vacantes */
-  .vac{
-    width:100%; text-align:left; font:inherit; color:inherit; cursor:pointer;
-    background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px;
-    margin-bottom:14px; display:block;
-  }
-  .vac:hover{border-color:var(--accent)}
-  .vac h2{margin-bottom:6px}
-  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
-  .chip{
-    font-size:13px; font-weight:600; padding:4px 10px; border-radius:999px;
-    background:var(--accent-soft); color:var(--ink);
-  }
+  /* Tarjetas de vacantes dentro del chat */
+  .vcards{display:grid; gap:10px}
+  .vcard{display:block; width:100%; text-align:left; cursor:pointer; background:var(--surface); border:1.5px solid var(--line); border-radius:16px; padding:14px 16px; transition:border-color .15s, transform .15s}
+  .vcard:hover{border-color:var(--accent); transform:translateY(-1px)}
+  .vcard b{display:block; font-family:var(--display); font-size:18px; line-height:1.25}
+  .vcard .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .vcard .chip{font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--accent-soft)}
+  .vcard .go{display:block; margin-top:10px; font-size:14px; font-weight:600; color:var(--accent)}
+  body:not([data-phase="home"]) .vcard{opacity:.55; pointer-events:none}
 
-  /* Ficha */
-  .sheet{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:8px 20px}
-  .sheet dl{margin:0}
-  .item{padding:16px 0; border-bottom:1px solid var(--line)}
-  .item:last-child{border-bottom:0}
-  .item dt{font-weight:600; color:var(--muted); font-size:14px; margin-bottom:4px}
-  .item dd{margin:0}
-  .plain{margin:0; padding-left:1.1em}
-  .plain li{margin-bottom:4px}
-  .steps{list-style:none; margin:0; padding:0; counter-reset:s}
-  .steps li{
-    counter-increment:s; position:relative; padding:0 0 16px 44px; min-height:32px;
-  }
-  .steps li::before{
-    content:counter(s); position:absolute; left:0; top:0; width:30px; height:30px; border-radius:50%;
-    background:var(--accent); color:var(--accent-ink); display:grid; place-items:center;
-    font-weight:700; font-size:14px;
-  }
-  .steps li::after{
-    content:""; position:absolute; left:14px; top:32px; bottom:2px; width:2px; background:var(--line);
-  }
-  .steps li:last-child{padding-bottom:0}
-  .steps li:last-child::after{display:none}
+  .bk{display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; text-decoration:none; background:var(--accent); color:var(--accent-ink) !important; border-radius:12px; padding:12px 16px; font-weight:600; min-height:46px}
+  .bk:hover{filter:brightness(1.08)}
 
-  .ask{
-    margin-top:24px; padding:20px; border-radius:16px; background:var(--accent-soft);
-  }
-  .ask h2{margin-bottom:4px}
-  .ask p{color:var(--muted); margin:0}
-
-  /* Filtro */
-  .progress{display:flex; gap:6px; margin:0 0 8px}
-  .progress i{flex:1; height:5px; border-radius:3px; background:var(--line)}
-  .progress i.on{background:var(--accent)}
-  .stepno{color:var(--muted); font-size:14px; margin:0 0 20px}
-  textarea{
-    width:100%; min-height:160px; padding:14px; font:inherit; color:var(--ink);
-    background:var(--surface); border:1.5px solid var(--line); border-radius:12px; resize:vertical;
-  }
-  textarea:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
-  .hint{color:var(--muted); font-size:14px; margin-top:8px}
-  .fld{display:block; font-weight:600; font-size:14px; margin:18px 0 6px}
-  .inp{width:100%; font:inherit; color:var(--ink); background:var(--surface); border:1.5px solid var(--line); border-radius:10px; padding:12px}
-  .inp:focus{outline:3px solid var(--accent); outline-offset:2px; border-color:var(--accent)}
-  .err{color:var(--warn); background:var(--warn-soft); padding:10px 14px; border-radius:10px; margin-top:12px; font-size:15px}
-  .choices{display:grid; gap:12px}
-  .choices.two{grid-template-columns:1fr 1fr}
-  .choices .btn{text-align:center}
-  .note{color:var(--muted); font-size:14px; margin-top:28px}
-
-  /* Resultado */
-  .result{border-radius:18px; padding:24px}
-  .result.ok{background:var(--ok-soft)}
-  .result.later{background:var(--warn-soft)}
-  .result h1{margin-bottom:10px}
-  .result ul{margin:10px 0 0; padding-left:1.1em}
-
-  .role{font-size:18px; line-height:1.65; max-width:60ch; margin:0 0 4px}
-  .topics{display:flex; flex-wrap:wrap; gap:10px; margin-top:4px}
-  .topic{font:inherit; font-weight:600; cursor:pointer; color:var(--ink); background:var(--surface); border:1.5px solid var(--line); border-radius:999px; padding:10px 18px; min-height:44px}
-  .topic:hover{border-color:var(--accent)}
-  .topic[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
-  .topic-panel{margin-top:16px; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:18px 20px}
-  .topic-panel[hidden]{display:none}
-  .topic-panel h2{font-size:16px; color:var(--muted)}
+  /* Escribiendo… */
+  .dots{display:inline-flex; gap:4px; padding:4px 2px}
+  .dots i{width:7px; height:7px; border-radius:50%; background:var(--muted); opacity:.5; animation:b 1s infinite}
+  .dots i:nth-child(2){animation-delay:.15s} .dots i:nth-child(3){animation-delay:.3s}
+  @keyframes b{0%,60%,100%{transform:none; opacity:.4} 30%{transform:translateY(-4px); opacity:1}}
   @media (prefers-reduced-motion: no-preference){
-    .swap{animation:in .25s ease-out}
-    @keyframes in{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+    .row.new{animation:pop .22s ease-out}
+    @keyframes pop{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
   }
-  @media (max-width:420px){ .choices.two{grid-template-columns:1fr} }
+  @media (prefers-reduced-motion: reduce){ .dots i{animation:none} #log{scroll-behavior:auto} }
+
+  /* Zona de respuesta */
+  #composer{background:var(--surface); border-top:1px solid var(--line); padding:12px 14px calc(12px + env(safe-area-inset-bottom))}
+  #composer:empty{display:none}
+  .qrs{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end}
+  .qr{cursor:pointer; background:var(--surface); color:var(--accent); border:1.5px solid var(--accent); border-radius:999px; padding:9px 16px; font-weight:600; min-height:42px; line-height:1.2}
+  .qr:hover{background:var(--accent-soft)}
+  .qr.solid{background:var(--accent); color:var(--accent-ink)}
+  .qr.solid:hover{filter:brightness(1.08)}
+  .qr.soft{border-color:var(--line); color:var(--muted)}
+  .qr.soft:hover{border-color:var(--accent); color:var(--accent); background:var(--surface)}
+  .qr.done{border-color:var(--line); color:var(--muted)}
+  .qr.done::before{content:"✓ "; color:var(--ok)}
+  .qrs.scroll{flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none; padding-bottom:2px; margin:0 -14px; padding-left:14px; padding-right:14px}
+  .qrs.scroll::-webkit-scrollbar{display:none}
+  .qrs.scroll .qr{flex:none; white-space:nowrap}
+  .lbl{font-size:12px; font-weight:600; color:var(--muted); margin:0 0 6px}
+  .qrs.col{flex-direction:column; align-items:stretch}
+  @media (max-width:480px){ .iconbtn .t{display:none} .iconbtn{padding:9px} }
+  .qrs.col .qr{text-align:left; border-radius:14px}
+  .cue{margin:0; text-align:center; color:var(--muted); font-size:14px}
+  .bar{display:flex; gap:8px; align-items:flex-end}
+  .field{flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--paper); border:1.5px solid var(--line); border-radius:22px; padding:11px 16px; min-height:46px}
+  textarea.field{resize:none; max-height:180px; line-height:1.45; border-radius:20px}
+  .field:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  select.field{flex:none; width:auto; padding-right:10px; cursor:pointer}
+  .cur{flex:none; align-self:center; font-weight:700; font-size:14px; background:var(--accent-soft); border-radius:999px; padding:8px 12px}
+  .send{flex:none; width:46px; height:46px; border-radius:50%; border:0; cursor:pointer; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center}
+  .send:hover{filter:brightness(1.08)}
+  .meta{display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:8px; min-height:18px}
+  .undo{background:none; border:0; padding:0; cursor:pointer; color:var(--muted); font-size:13px; font-weight:600}
+  .undo:hover{color:var(--accent)}
+  .count{font-size:12px; color:var(--muted); margin-left:auto}
+  .count.ok{color:var(--ok)}
+  .cerr{color:var(--warn); background:var(--warn-soft); border-radius:10px; padding:8px 12px; font-size:14px; margin-top:8px}
+  .cerr:empty{display:none}
+  .fine{font-size:12px; color:var(--muted); text-align:center; margin:8px 0 0}
 </style>
 </head>
-<body>
-<div class="wrap">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>
-    <span>Reclutamiento</span>
-  </div>
-  <main id="app" aria-live="polite"></main>
+<body data-phase="inicio">
+<div class="app">
+  <header class="top">
+    <span class="av" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>
+    <div class="who"><b>Reclutamiento</b><span id="sub">Asistente · en línea</span></div>
+    <button class="iconbtn" data-a="reiniciar" aria-label="Empezar de nuevo"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7"/><path d="M3.5 3.5v3.5H7"/></svg><span class="t">Empezar de nuevo</span></button>
+    <div class="prog" aria-hidden="true"><i id="prog"></i></div>
+  </header>
+  <main id="log" role="log" aria-live="polite" aria-label="Conversación"></main>
+  <div id="composer"></div>
 </div>
+<noscript><p style="padding:20px">Activa JavaScript para usar el prefiltro.</p></noscript>
 
 <script src="config.js"></script>
 <script>
 /* ============================================================
-   CONFIGURACIÓN: edita aquí
+   CONFIGURACIÓN: se edita en config.js
    ============================================================ */
-const CFG = window.CONFIG || {};       // Se edita en config.js
+const CFG = window.CONFIG || {};
 const AGENDA_LINK = CFG.AGENDA_LINK || "";
 const ENDPOINT = CFG.ENDPOINT || "";
 const AVISO_URL = CFG.AVISO_URL || "";
-const CONTACTO_TEXTO = "Un integrante del equipo de reclutamiento te atenderá. Escríbenos por el mismo canal por el que te contactamos.";
 
-/* Las vacantes se cargan desde tu hoja de Google (se administran en admin.html).
-   Esta lista solo se usa si ENDPOINT está vacío (modo prueba local). */
+/* Las vacantes se cargan desde tu hoja de Google (se administran en admin.html). */
 let VACANTES = [];
 let carga = { estado: ENDPOINT ? "cargando" : "listo" };
 
@@ -214,14 +176,10 @@ const MONEDAS = [
   { code: "EUR", label: "Euros (EUR)", simbolo: "€", min: 200, max: 50000, ejemplo: "1.500" },
   { code: "MXN", label: "Pesos mexicanos (MXN)", simbolo: "MX$", min: 3000, max: 800000, ejemplo: "25.000" }
 ];
-const monedaSimbolo = c => (MONEDAS.find(m => m.code === c) || MONEDAS[0]).simbolo;
 const monedaInfo = c => MONEDAS.find(m => m.code === c) || MONEDAS[0];
 const MIN_CARACTERES = 25;
 
-/* ---------- Preguntas del prefiltro ----------
-   Cada vacante trae su lista de preguntas desde admin.html. Tipos:
-   texto (respuesta abierta), sino (Sí/No), opciones, ingles (nivel) y salario.
-   Las vacantes creadas antes de este cambio usan las 5 preguntas de siempre. */
+/* ---------- Preguntas del prefiltro ---------- */
 const TIPOS = ["texto", "sino", "opciones", "ingles", "salario"];
 function preguntasPorDefecto(v){
   const ps = [
@@ -274,10 +232,13 @@ function textoRespuesta(q, r){
 }
 
 /* ============================================================ */
-const $app = document.getElementById("app");
+const $log = document.getElementById("log");
+const $comp = document.getElementById("composer");
+const $prog = document.getElementById("prog");
+const $sub = document.getElementById("sub");
 const activas = () => VACANTES.filter(v => v.estado === "Activa");
 const vacById = id => VACANTES.find(v => v.id === id);
-const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const arr = x => Array.isArray(x) ? x.filter(Boolean) : [];
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function normalizar(v){
@@ -303,27 +264,25 @@ function normalizar(v){
 }
 async function cargarVacantes(){
   if(!ENDPOINT){ carga.estado = "listo"; return; }
-  carga.estado = "cargando"; if(state.view === "home") render();
+  carga.estado = "cargando";
   try{
     const r = await fetch(ENDPOINT + "?accion=vacantes&t=" + Date.now());
     const j = await r.json();
     VACANTES = (j.vacantes || []).filter(v => v && v.id).map(normalizar);
     carga.estado = "listo";
   }catch(e){ carga.estado = "error"; }
-  if(state.view === "home") render();
 }
-const CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg>';
-const BACK = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l-6 6 6 6"/></svg>';
+let cargaP = cargarVacantes();
 
 const TEMAS = {
-  responsabilidades: { titulo: "Responsabilidades" },
-  salario:    { titulo: "Salario" },
-  beneficios: { titulo: "Beneficios" },
-  ubicacion:  { titulo: "Ubicación" },
-  modalidad:  { titulo: "Modalidad" },
-  horario:    { titulo: "Horario" },
-  requisitos: { titulo: "Requisitos" },
-  etapas:     { titulo: "Proceso de selección" }
+  responsabilidades: { titulo: "Responsabilidades", ico: "📋" },
+  salario:    { titulo: "Salario", ico: "💰" },
+  beneficios: { titulo: "Beneficios", ico: "🎁" },
+  ubicacion:  { titulo: "Ubicación", ico: "📍" },
+  modalidad:  { titulo: "Modalidad", ico: "🏠" },
+  horario:    { titulo: "Horario", ico: "🕒" },
+  requisitos: { titulo: "Requisitos", ico: "✅" },
+  etapas:     { titulo: "Proceso de selección", ico: "🧭" }
 };
 const hasTema = (id, v) => ({
   responsabilidades: arr(v.responsabilidades).length > 0,
@@ -335,205 +294,238 @@ const hasTema = (id, v) => ({
   requisitos: arr(v.requisitos).length > 0,
   etapas: arr(v.etapas).length > 0 || !!v.tiempos
 }[id]);
-
-let state = { view: "home", vacId: null, tema: null, step: 0, ans: {}, moneda: "COP", datos: { nombre: "", correo: "" }, err: "" };
-
-const ul = a => '<ul class="plain">' + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
-const back = (action, label) => `<button class="linkback" data-a="${action}">${BACK}${label}</button>`;
-const item = (dt, dd) => dd ? `<div class="item"><dt>${dt}</dt><dd>${dd}</dd></div>` : "";
-
+const ul = a => "<ul>" + arr(a).map(x => `<li>${x}</li>`).join("") + "</ul>";
 function temaContenido(id, v){
   switch(id){
     case "responsabilidades": return ul(v.responsabilidades);
-    case "salario":    return `<p style="font-size:20px;font-weight:600;margin:0">${v.salario}</p>`;
+    case "salario":    return `<p class="big">${v.salario}</p>`;
     case "beneficios": return ul(v.beneficios);
     case "ubicacion":  return ul(v.sedes);
-    case "modalidad":  return `<p style="margin:0">${v.modalidad}</p>`;
-    case "horario":    return `<p style="margin:0">${v.horario}</p>`;
+    case "modalidad":  return `<p>${v.modalidad}</p>`;
+    case "horario":    return `<p>${v.horario}</p>`;
     case "requisitos": return ul(v.requisitos);
     case "etapas":
       return (arr(v.etapas).length ? `<ol class="steps">${arr(v.etapas).map(e => `<li>${e}</li>`).join("")}</ol>` : "")
-           + (v.tiempos ? `<p style="margin:${arr(v.etapas).length ? "16px" : "0"} 0 0">El proceso toma entre <strong>${v.tiempos}</strong>.</p>` : "");
+           + (v.tiempos ? `<p style="margin-top:${arr(v.etapas).length ? "10px" : "0"}">El proceso toma entre <strong>${v.tiempos}</strong>.</p>` : "");
   }
+  return "";
 }
 
-/* ---------- Vistas ---------- */
-function vHome(){
-  if(carga.estado === "cargando"){
-    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1><p class="lead">Cargando vacantes…</p></div>`;
+/* ============================================================
+   Motor del chat
+   ============================================================ */
+const AV = '<span class="av" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg></span>';
+const SEND = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5L10 4l5.5 5.5"/></svg>';
+const RM = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+let log = [];          // { who: "bot" | "me", html, cls }
+let phase = "inicio";  // inicio, home, error, vacio, vac, consent, nombre, correo, pregunta, fin
+let busy = false;
+let state = { vacId: null, temas: new Set(), step: 0, ans: {}, moneda: "COP", datos: { nombre: "", correo: "" }, qStart: [] };
+let sesion = 0;        // invalida mensajes pendientes al reiniciar
+
+function rowHtml(m, i){
+  const prev = log[i - 1];
+  const cont = prev && prev.who === m.who;
+  return `<div class="row ${m.who}${cont ? " cont" : ""}">${m.who === "bot" ? AV : ""}<div class="bubble ${m.cls || ""}">${m.html}</div></div>`;
+}
+function renderLog(){
+  $log.innerHTML = `<p class="day">Hoy</p>` + log.map(rowHtml).join("");
+  abajo();
+}
+function push(m){
+  log.push(m);
+  const d = document.createElement("div");
+  d.innerHTML = rowHtml(m, log.length - 1);
+  const node = d.firstElementChild; node.classList.add("new");
+  const typing = document.getElementById("typing");
+  $log.insertBefore(node, typing || null);
+  abajo();
+}
+function abajo(){ requestAnimationFrame(() => { $log.scrollTop = $log.scrollHeight; }); }
+function typing(on){
+  const t = document.getElementById("typing");
+  if(on && !t){
+    const prev = log[log.length - 1];
+    $log.insertAdjacentHTML("beforeend", `<div class="row bot${prev && prev.who === "bot" ? " cont" : ""}" id="typing" aria-label="Escribiendo">${AV}<div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div></div>`);
+    abajo();
+  } else if(!on && t){ t.remove(); }
+}
+async function bot(...items){
+  const s = sesion;
+  busy = true; composer();
+  for(const it of items){
+    const m = typeof it === "string" ? { html: it } : it;
+    typing(true);
+    const largo = m.html.replace(/<[^>]+>/g, "").length;
+    await sleep(RM ? 120 : Math.min(1100, 380 + largo * 5));
+    if(s !== sesion) return false;
+    typing(false);
+    push({ who: "bot", html: m.html, cls: m.cls });
   }
+  busy = false;
+  return true;
+}
+function me(texto){ push({ who: "me", html: esc(texto) }); }
+function setPhase(p){ phase = p; busy = false; composer(); }
+
+/* ---------- Zona de respuesta según el momento ---------- */
+const qr = (a, t, cls = "", extra = "") => `<button class="qr ${cls}" data-a="${a}" ${extra}>${t}</button>`;
+const preguntaActual = () => arr((vacById(state.vacId) || {}).preguntas)[state.step];
+
+function composer(){
+  document.body.dataset.phase = phase;
+  const v = vacById(state.vacId);
+  const n = nPreg(v);
+  $prog.style.width = phase === "pregunta" ? (100 * state.step / Math.max(1, n)) + "%" : (phase === "fin" && n ? "100%" : "0");
+  $sub.textContent = phase === "pregunta" ? `Pregunta ${state.step + 1} de ${n}` : (busy ? "Escribiendo…" : "Asistente · en línea");
+  if(busy){ $comp.innerHTML = ""; return; }
+  let h = "";
+  if(phase === "home") h = `<p class="cue">Toca una vacante para ver los detalles ☝️</p>`;
+  else if(phase === "error") h = `<div class="qrs">${qr("reintentar", "Reintentar", "solid")}</div>`;
+  else if(phase === "vacio") h = `<div class="qrs">${qr("reintentar", "Volver a revisar")}</div>`;
+  else if(phase === "vac"){
+    const temas = Object.keys(TEMAS).filter(t => hasTema(t, v));
+    h = `${temas.length ? `<p class="lbl">Conoce más (desliza →)</p>` : ""}<div class="qrs scroll">${temas.map(t => qr("tema", `${TEMAS[t].ico} ${TEMAS[t].titulo}`, state.temas.has(t) ? "done" : "", `data-id="${t}"`)).join("")}</div>
+      <div class="qrs" style="margin-top:10px">${qr("otras", "Ver otras vacantes", "soft")}${qr("no-interes", "No por ahora", "soft")}${qr("postular", "Quiero postularme 🙌", "solid")}</div>`;
+  }
+  else if(phase === "consent") h = `<div class="qrs">${qr("no-acepto", "No acepto", "soft")}${qr("acepto", "Sí, autorizo", "solid")}</div>`;
+  else if(phase === "nombre") h = barra("nombre", `<input class="field" id="inp" type="text" autocomplete="name" placeholder="Escribe tu nombre completo" value="${esc(state.datos.nombre)}" aria-label="Nombre completo">`);
+  else if(phase === "correo") h = barra("correo", `<input class="field" id="inp" type="email" inputmode="email" autocomplete="email" placeholder="nombre@correo.com" value="${esc(state.datos.correo)}" aria-label="Correo electrónico">`);
+  else if(phase === "pregunta") h = composerPregunta(v);
+  else if(phase === "fin") h = `<div class="qrs">${qr("otras", "Ver otras vacantes", "solid")}</div>`;
+  $comp.innerHTML = h;
+  const f = document.getElementById("inp");
+  if(f){ f.focus({ preventScroll: true }); if(f.tagName === "TEXTAREA") autosize(f); contar(); }
+}
+function barra(k, campo, extra = ""){
+  return `<div class="bar">${campo}<button class="send" data-a="send" data-k="${k}" aria-label="Enviar">${SEND}</button></div>
+    <div class="cerr" id="cerr" role="alert"></div>${extra}`;
+}
+function composerPregunta(v){
+  const q = preguntaActual(), r = state.ans[q.id];
+  const undo = state.step > 0 ? `<button class="undo" data-a="undo">↩ Cambiar respuesta anterior</button>` : "";
+  const pie = `<div class="meta">${undo}<span class="count" id="count"></span></div>`;
+  if(q.tipo === "texto")
+    return barra("texto", `<textarea class="field" id="inp" rows="1" maxlength="1200" placeholder="Escribe tu respuesta…" aria-label="Tu respuesta">${esc(r || "")}</textarea>`, pie);
+  if(q.tipo === "sino")
+    return `<div class="qrs">${["Sí", "No"].map(o => qr("ans", o, "", `data-v="${o}"`)).join("")}</div>${pie}`;
+  if(q.tipo === "opciones"){
+    const largas = q.opciones.some(o => o.length > 28);
+    return `<div class="qrs${largas ? " col" : ""}">${q.opciones.map(o => qr("ans", esc(o), "", `data-v="${esc(o)}"`)).join("")}</div>${pie}`;
+  }
+  if(q.tipo === "ingles")
+    return `<div class="qrs">${NIVELES_INGLES.map(o => qr("ans", o, "", `data-v="${o}"`)).join("")}</div>${pie}`;
+  // salario
+  const fija = q.tope > 0;
+  const mon = fija ? `<span class="cur">${q.moneda}</span>`
+    : `<select class="field" id="moneda" aria-label="Moneda">${MONEDAS.map(m => `<option value="${m.code}" ${state.moneda === m.code ? "selected" : ""}>${m.code}</option>`).join("")}</select>`;
+  const monto = r && r.monto ? fmtMonto(r.monto) : "";
+  return barra("salario", `${mon}<input class="field" id="inp" type="text" inputmode="numeric" autocomplete="off" placeholder="Monto mensual, ej. ${monedaInfo(fija ? q.moneda : state.moneda).ejemplo}" value="${monto}" aria-label="Expectativa salarial mensual">`, pie);
+}
+function autosize(t){ t.style.height = "auto"; t.style.height = Math.min(180, t.scrollHeight + 3) + "px"; }
+function contar(){
+  const c = document.getElementById("count"), f = document.getElementById("inp");
+  if(!c || !f || phase !== "pregunta") return;
+  const q = preguntaActual();
+  if(q.tipo !== "texto" || q.min <= 1){ c.textContent = ""; return; }
+  const n = f.value.trim().length;
+  c.textContent = n >= q.min ? "✓ Suficiente" : `${n}/${q.min} caracteres`;
+  c.className = "count" + (n >= q.min ? " ok" : "");
+}
+const error = t => { const e = document.getElementById("cerr"); if(e) e.textContent = t; };
+
+/* ---------- Pasos de la conversación ---------- */
+async function inicio(){
+  sesion++; log = []; busy = false; phase = "inicio"; state.vacId = null;
+  renderLog(); composer();
+  if(!(await bot("¡Hola! 👋 Soy el asistente de reclutamiento.", "Te cuento sobre nuestras vacantes y, si te interesa alguna, en un par de minutos sabrás si puedes agendar entrevista."))) return;
+  await mostrarVacantes(true);
+}
+async function mostrarVacantes(primera){
+  const s = sesion;
+  if(carga.estado === "cargando"){ busy = true; composer(); typing(true); await cargaP; typing(false); if(s !== sesion) return; }
   if(carga.estado === "error"){
-    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1>
-      <p class="lead">No pudimos cargar las vacantes. Revisa tu conexión e intenta de nuevo.</p>
-      <div class="actions"><button class="btn solid" data-a="reintentar">Reintentar</button></div></div>`;
+    if(await bot("Uy, no pude cargar las vacantes 😕 Revisa tu conexión e intenta de nuevo.")) setPhase("error");
+    return;
   }
   const a = activas();
   if(!a.length){
-    return `<div class="swap"><h1 tabindex="-1">Vacantes disponibles</h1>
-      <p class="lead">Por ahora no tenemos vacantes abiertas. Vuelve pronto.</p></div>`;
+    if(await bot("Por ahora no tenemos vacantes abiertas. ¡Vuelve pronto! 🙌")) setPhase("vacio");
+    return;
   }
-  return `<div class="swap">
-    <h1 tabindex="-1">Vacantes disponibles</h1>
-    <p class="lead">Elige una vacante para conocer los detalles y averiguar si tu perfil encaja.</p>
-    ${a.map(v => {
-      const chips = [...arr(v.sedes).map(x => x.split(" (")[0]), v.modalidad ? v.modalidad.split(";")[0].trim() : "", v.horario || ""].filter(Boolean);
-      return `<button class="vac" data-a="vac" data-id="${esc(v.id)}">
-        <h2>${v.nombre}</h2>
-        ${chips.length ? `<div class="chips">${chips.map(c => `<span class="chip">${c}</span>`).join("")}</div>` : ""}
-      </button>`;
-    }).join("")}
-  </div>`;
+  const cards = `<div class="vcards">${a.map(v => {
+    const chips = [...arr(v.sedes).map(x => x.split(" (")[0]), v.modalidad ? v.modalidad.split(";")[0].trim() : "", v.horario || ""].filter(Boolean);
+    return `<button class="vcard" data-a="vac" data-id="${esc(v.id)}"><b>${v.nombre}</b>
+      ${chips.length ? `<span class="chips">${chips.map(c => `<span class="chip">${c}</span>`).join("")}</span>` : ""}
+      <span class="go">Ver detalles →</span></button>`;
+  }).join("")}</div>`;
+  const intro = primera
+    ? (a.length === 1 ? "Esta es la vacante abierta en este momento:" : `Tenemos ${a.length} vacantes abiertas. Toca la que te interese:`)
+    : "¡Claro! Estas son las vacantes abiertas:";
+  if(await bot(intro, { html: cards, cls: "wide" })) setPhase("home");
 }
-
-function vVac(){
-  const v = vacById(state.vacId);
+async function abrirVacante(id){
+  const v = vacById(id); if(!v) return;
+  state.vacId = id; state.temas = new Set();
+  me(v.nombreRaw);
+  const n = nPreg(v);
+  const cuantas = n === 0 ? "solo te pediré tus datos de contacto" : n === 1 ? "te haré 1 pregunta rápida" : `te haré ${n} preguntas rápidas`;
   const temas = Object.keys(TEMAS).filter(t => hasTema(t, v));
-  return `<div class="swap">${back("home","Ver otras vacantes")}
-    <h1 tabindex="-1">${v.nombre}</h1>
-    ${v.descripcion ? `<h2>Sobre el rol</h2><p class="role">${v.descripcion}</p>` : ""}
-    ${temas.length ? `<h2 style="margin-top:28px">Conoce más</h2>
-      <div class="topics">${temas.map(t => `<button class="topic" data-a="chip" data-id="${t}" aria-pressed="false">${TEMAS[t].titulo}</button>`).join("")}</div>
-      <div class="topic-panel" id="topicPanel" hidden aria-live="polite"></div>` : ""}
-    <div class="ask" style="margin-top:32px"><h2>¿Te interesa esta vacante?</h2><p>${nPreg(v) === 0 ? "Si tu respuesta es sí, solo te pediremos tus datos de contacto." : nPreg(v) === 1 ? "Si tu respuesta es sí, te haremos 1 pregunta rápida para saber si puedes agendar entrevista." : `Si tu respuesta es sí, te haremos ${nPreg(v)} preguntas rápidas para saber si puedes agendar entrevista.`}</p>
-      <div class="actions" style="margin-top:16px">
-        <button class="btn solid" data-a="filtro">Sí, me interesa</button>
-        <button class="btn" data-a="no-interes">No por ahora</button>
-      </div></div>
-  </div>`;
+  const msgs = [`<p class="tt">${v.nombre}</p>${v.descripcion ? `<p>${v.descripcion}</p>` : ""}`];
+  msgs.push(temas.length
+    ? `¿Qué te gustaría saber? Elige un tema abajo 👇 Cuando estés listo, postúlate: ${cuantas}.`
+    : `¿Te interesa? Si te postulas, ${cuantas}.`);
+  if(await bot(...msgs)) setPhase("vac");
 }
-
-function vNoInteres(){
-  return `<div class="swap"><h1 tabindex="-1">Gracias por tu tiempo</h1>
-    <p class="lead">Cuando quieras retomar, aquí estaremos. Puedes revisar otras vacantes.</p>
-    <div class="actions"><button class="btn solid" data-a="home">Ver otras vacantes</button></div></div>`;
+async function verTema(t){
+  const v = vacById(state.vacId);
+  state.temas.add(t);
+  me(`${TEMAS[t].ico} ${TEMAS[t].titulo}`);
+  if(await bot(`<p class="tt">${TEMAS[t].titulo}</p>${temaContenido(t, v)}`)) setPhase("vac");
 }
-
-function vConsent(){
-  const link = AVISO_URL ? ` <a href="${AVISO_URL}" target="_blank" rel="noopener" style="color:var(--accent)">Ver política de tratamiento de datos</a>.` : "";
-  return `<div class="swap">${back("vac-page","Volver a la vacante")}
-    <h1 tabindex="-1">Antes de empezar</h1>
-    <p class="lead">Para evaluar tu perfil y poder contactarte vamos a guardar tu nombre, tu correo y las respuestas que nos compartas en este prefiltro.</p>
-    <div class="sheet" style="padding:20px">
-      <p>Usamos esta información solo para el proceso de selección y para medir cómo funciona este prefiltro. Solo el equipo de reclutamiento puede consultarla.</p>
-      <p>Como titular de tus datos tienes derecho a conocerlos, actualizarlos y solicitar su supresión (Ley 1581 de 2012). Puedes ejercerlos escribiendo al equipo de reclutamiento.${link}</p>
-      <label style="display:flex;gap:12px;align-items:flex-start;margin-top:16px;cursor:pointer">
-        <input type="checkbox" id="okDatos" style="width:22px;height:22px;margin-top:2px;accent-color:var(--accent)">
-        <span>Autorizo el tratamiento de mis datos para este proceso de selección.</span>
-      </label>
-    </div>
-    <div class="actions"><button class="btn solid" id="btnAcepto" data-a="acepto" disabled>Acepto y continúo</button>
-      <button class="btn" data-a="no-acepto">No acepto</button></div></div>`;
+async function postular(){
+  me("Quiero postularme 🙌");
+  const link = AVISO_URL ? ` <a href="${esc(AVISO_URL)}" target="_blank" rel="noopener">Ver política de tratamiento de datos</a>.` : "";
+  const ok = await bot("¡Genial! Antes de empezar, algo importante 🔒",
+    `<p>Para evaluar tu perfil y contactarte vamos a guardar tu <strong>nombre</strong>, tu <strong>correo</strong> y tus <strong>respuestas</strong>. Solo el equipo de reclutamiento puede verlos y se usan únicamente para este proceso de selección.</p>
+     <p>Puedes conocer, actualizar o pedir que borremos tus datos cuando quieras (Ley 1581 de 2012).${link}</p>
+     <p><strong>¿Autorizas el tratamiento de tus datos para este proceso?</strong></p>`);
+  if(ok) setPhase("consent");
 }
-
-function vDatos(){
-  const d = state.datos;
-  return `<div class="swap">${back("filtro","Volver")}
-    <h1 tabindex="-1">Tus datos de contacto</h1>
-    <p class="lead">Así podremos comunicarnos contigo sobre tu postulación.</p>
-    <label class="fld" for="nombre">Nombre completo</label>
-    <input class="inp" type="text" id="nombre" autocomplete="name" value="${esc(d.nombre)}">
-    <label class="fld" for="correo">Correo electrónico</label>
-    <input class="inp" type="email" id="correo" autocomplete="email" inputmode="email" value="${esc(d.correo)}">
-    ${state.err ? `<div class="err" role="alert">${state.err}</div>` : ""}
-    <div class="actions"><button class="btn solid" data-a="datos-ok">Continuar</button></div></div>`;
+function reiniciarFiltro(){
+  const v = vacById(state.vacId);
+  const pSal = arr(v && v.preguntas).find(q => q.tipo === "salario");
+  state.step = 0; state.ans = {}; state.qStart = [];
+  state.moneda = pSal && pSal.tope > 0 ? pSal.moneda : "COP";
+  state.datos = { nombre: "", correo: "" };
 }
-
-function progress(){
-  const n = nPreg(vacById(state.vacId));
-  return `<div class="progress" aria-hidden="true">${Array.from({ length: n }, (_, i) => i).map(i => `<i class="${i <= state.step ? "on" : ""}"></i>`).join("")}</div>
-          <p class="stepno">Pregunta ${state.step + 1} de ${n}</p>`;
+async function preguntar(){
+  const v = vacById(state.vacId), q = preguntaActual(), n = nPreg(v);
+  let extra = q.ayuda ? `<small>${esc(q.ayuda)}</small>` : "";
+  if(q.tipo === "ingles" && !q.ayuda) extra = `<small>Elige el que mejor te describa.</small>`;
+  if(q.tipo === "salario") extra += `<small>${q.tope > 0 ? `Escríbela mensual en ${monedaInfo(q.moneda).label}.` : "Escribe el monto mensual y elige la moneda."}</small>`;
+  state.qStart[state.step] = log.length;
+  if(await bot(`<span class="qn">Pregunta ${state.step + 1} de ${n}</span><br>${esc(q.texto)}${extra}`)) setPhase("pregunta");
 }
-
-const preguntaActual = () => arr((vacById(state.vacId) || {}).preguntas)[state.step];
-
-function vPregunta(){
-  const s = state.step, q = preguntaActual(), r = state.ans[q.id];
-  const prev = s === 0 ? back("vac-page","Volver a la vacante") : back("prev","Pregunta anterior");
-  const lead = q.ayuda ? `<p class="lead" style="margin-bottom:16px">${esc(q.ayuda)}</p>` : `<p class="lead" style="margin-bottom:16px">&nbsp;</p>`;
-  const titulo = `<h1 tabindex="-1">${esc(q.texto)}</h1>`;
-  const opcion = val => `<button class="btn" data-a="ans" data-v="${esc(val)}" aria-pressed="${r === val}">${esc(val)}</button>`;
-  const err = state.err ? `<div class="err" role="alert">${state.err}</div>` : "";
-  let body = "";
-  if(q.tipo === "texto"){
-    body = `${titulo}${lead}
-      <label for="txt" class="hint" style="display:block;margin:0 0 8px">Tu respuesta</label>
-      <textarea id="txt" maxlength="1200">${esc(r || "")}</textarea>
-      ${err}
-      <div class="actions"><button class="btn solid" data-a="next">Continuar</button></div>`;
-  } else if(q.tipo === "sino"){
-    body = `${titulo}${lead}<div class="choices two">${opcion("Sí")}${opcion("No")}</div>`;
-  } else if(q.tipo === "opciones"){
-    body = `${titulo}${lead}<div class="choices">${q.opciones.map(opcion).join("")}</div>`;
-  } else if(q.tipo === "ingles"){
-    body = `${titulo}${q.ayuda ? lead : `<p class="lead" style="margin-bottom:16px">Elige el que mejor te describa.</p>`}<div class="choices">${NIVELES_INGLES.map(opcion).join("")}</div>`;
-  } else {
-    const monedaFija = q.tope > 0;
-    const monto = r && r.monto ? r.monto : "";
-    body = `${titulo}
-      ${q.ayuda ? `<p class="lead" style="margin-bottom:8px">${esc(q.ayuda)}</p>` : ""}
-      ${monedaFija
-        ? `<p class="lead" style="margin-bottom:8px">Esta vacante evalúa el salario en <strong>${monedaInfo(q.moneda).label}</strong>. Escribe tu expectativa mensual en esa moneda.</p>`
-        : `${q.ayuda ? "" : `<p class="lead" style="margin-bottom:8px">Escribe el monto mensual y elige la moneda.</p>`}
-      <label class="fld" for="moneda">Moneda</label>
-      <select class="inp" id="moneda">${MONEDAS.map(m => `<option value="${m.code}" ${state.moneda === m.code ? "selected" : ""}>${m.label}</option>`).join("")}</select>`}
-      <label class="fld" for="salario">Expectativa salarial mensual${monedaFija ? ` (${q.moneda})` : ""}</label>
-      <input class="inp" type="text" id="salario" inputmode="numeric" autocomplete="off" value="${fmtMonto(monto)}">
-      ${err}
-      <div class="actions"><button class="btn solid" data-a="salario-ok">${s === nPreg(vacById(state.vacId)) - 1 ? "Enviar mis respuestas" : "Continuar"}</button></div>`;
-  }
-  return `<div class="swap">${prev}${progress()}${body}
-    <p class="note">${ENDPOINT ? "Guardamos tus respuestas junto con tu nombre y correo para el proceso de selección." : "Tus respuestas se usan solo en esta pantalla y no se guardan."}</p></div>`;
+async function responder(q, valor, mostrar){
+  state.ans[q.id] = valor;
+  me(mostrar);
+  if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; await preguntar(); }
+  else await finalizar();
 }
-
 function preguntasFallidas(){
   const v = vacById(state.vacId);
   return arr(v.preguntas).filter(q => !pasaPregunta(q, state.ans[q.id]));
 }
-
-function vResultado(){
-  const apto = preguntasFallidas().length === 0;
-  if(apto){
-    const v0 = vacById(state.vacId) || {};
-    const recs = arr(v0.reclutadores);
-    let cta;
-    if(recs.length > 1){
-      cta = `<p>Ya recibimos tus datos. Te invito a agendar con uno de nuestros ${recs.length} reclutadores (de preferencia el que te contactó).</p>
-        <div class="actions" style="flex-direction:column;align-items:stretch">${recs.map(r => `<a class="btn solid" href="${r.link}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">Agendar con ${r.nombre}</a>`).join("")}</div>`;
-    } else if(recs.length === 1){
-      cta = `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con ${recs[0].nombre}.</p>
-        <div class="actions"><a class="btn solid" href="${recs[0].link}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`;
-    } else if(AGENDA_LINK){
-      cta = `<p>Ya recibimos tus datos. Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p>
-        <div class="actions"><a class="btn solid" href="${AGENDA_LINK}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Agendar mi entrevista</a></div>`;
-    } else {
-      cta = `<p>Ya recibimos tus datos. El equipo de reclutamiento te escribirá al correo que nos dejaste para coordinar la entrevista.</p>`;
-    }
-    return `<div class="swap"><div class="result ok"><h1 tabindex="-1">¡Genial! Tu perfil encaja</h1>
-      ${cta}</div>
-      <div class="actions"><button class="btn" data-a="home">Volver al inicio</button></div></div>`;
-  }
-  return `<div class="swap"><div class="result later"><h1 tabindex="-1">Gracias por postularte</h1>
-    <p>Recibimos tu información. Revisaremos tu perfil y nos pondremos en contacto contigo.</p></div>
-    <div class="actions"><button class="btn solid" data-a="home">Ver otras vacantes</button></div></div>`;
-}
-
 function enviarResultado(payload){
   if(!ENDPOINT) return;
   try{
     fetch(ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }).catch(() => {});
   }catch(e){}
 }
-
-const VIEWS = { home: vHome, vac: vVac, consent: vConsent, datos: vDatos, nointeres: vNoInteres, pregunta: vPregunta, resultado: vResultado };
-
-function render(){
-  $app.innerHTML = VIEWS[state.view]();
-  const h1 = $app.querySelector("h1");
-  if(h1){ h1.focus({ preventScroll: true }); }
-  window.scrollTo({ top: 0 });
-}
-
-function finalizar(){
+async function finalizar(){
   const v = vacById(state.vacId), a = state.ans, ps = arr(v.preguntas);
   const fallidas = preguntasFallidas();
   const primera = tipo => ps.find(q => q.tipo === tipo);
@@ -541,7 +533,6 @@ function finalizar(){
   const pIngles = primera("ingles"), pSal = primera("salario");
   const pExp = ps.find(q => q.id === "exp") || primera("texto");
   const sal = pSal ? (a[pSal.id] || {}) : {};
-  state.view = "resultado"; render();
   enviarResultado({
     tipo: "resultado", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw,
     pasa: fallidas.length === 0, fallas: fallidas.map(q => q.texto.length > 80 ? q.texto.slice(0, 77) + "…" : q.texto),
@@ -551,95 +542,122 @@ function finalizar(){
     nombre: state.datos.nombre.trim(), correo: state.datos.correo.trim(), experiencia: resp(pExp),
     expectativaSalarial: Number(String(sal.monto || "").replace(/\D/g, "")) || 0, monedaSalarial: sal.moneda || ""
   });
+  const nom = esc(state.datos.nombre.trim().split(/\s+/)[0]);
+  if(!(await bot(`¡Listo, ${nom}! Ya recibí tus respuestas ✨`))) return;
+  let res;
+  if(fallidas.length === 0){
+    const recs = arr(v.reclutadores);
+    let cta;
+    if(recs.length > 1){
+      cta = `<p>Te invito a agendar con uno de nuestros ${recs.length} reclutadores (de preferencia con quien te contactó):</p>
+        ${recs.map(r => `<a class="bk" href="${r.link}" target="_blank" rel="noopener">📅 Agendar con ${r.nombre}</a>`).join("")}`;
+    } else if(recs.length === 1){
+      cta = `<p>Da el siguiente paso y agenda tu entrevista con ${recs[0].nombre}.</p><a class="bk" href="${recs[0].link}" target="_blank" rel="noopener">📅 Agendar mi entrevista</a>`;
+    } else if(AGENDA_LINK){
+      cta = `<p>Da el siguiente paso y agenda tu entrevista con el equipo de reclutamiento.</p><a class="bk" href="${esc(AGENDA_LINK)}" target="_blank" rel="noopener">📅 Agendar mi entrevista</a>`;
+    } else {
+      cta = `<p>El equipo de reclutamiento te escribirá al correo que nos dejaste para coordinar la entrevista.</p>`;
+    }
+    res = { html: `<p class="tt">🎉 ¡Tu perfil encaja!</p>${cta}`, cls: "ok" };
+  } else {
+    res = { html: `<p class="tt">Gracias por postularte 💙</p><p>Recibimos tu información. Revisaremos tu perfil y nos pondremos en contacto contigo.</p>`, cls: "later" };
+  }
+  if(await bot(res)) setPhase("fin");
 }
 
-function reiniciarFiltro(){
-  const v = vacById(state.vacId);
-  const pSal = arr(v && v.preguntas).find(q => q.tipo === "salario");
-  state.step = 0; state.err = ""; state.ans = {};
-  state.moneda = pSal && pSal.tope > 0 ? pSal.moneda : "COP";
-  state.datos = { nombre: "", correo: "" };
-}
-
-function avanzar(){
-  if(state.step < nPreg(vacById(state.vacId)) - 1){ state.step += 1; render(); } else { finalizar(); }
-}
-
-$app.addEventListener("click", e => {
+/* ---------- Eventos ---------- */
+document.addEventListener("click", async e => {
   const el = e.target.closest("[data-a]"); if(!el) return;
-  const act = el.dataset.a;
-  if(act === "home"){ state.view = "home"; render(); }
-  else if(act === "reintentar"){ cargarVacantes(); }
-  else if(act === "vac"){ state.vacId = el.dataset.id; state.tema = null; state.view = "vac"; render(); }
-  else if(act === "vac-page"){ state.view = "vac"; render(); }
-  else if(act === "chip"){
-    const id = el.dataset.id;
-    state.tema = state.tema === id ? null : id;
-    document.querySelectorAll(".topic").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === state.tema)));
-    const panel = document.getElementById("topicPanel");
-    panel.innerHTML = state.tema ? `<h2>${TEMAS[state.tema].titulo}</h2>${temaContenido(state.tema, vacById(state.vacId))}` : "";
-    panel.hidden = !state.tema;
-  }
-  else if(act === "filtro"){ state.view = "consent"; render(); }
-  else if(act === "acepto"){ reiniciarFiltro(); state.view = "datos"; render(); }
-  else if(act === "datos-ok"){
-    const n = state.datos.nombre.trim(), c = state.datos.correo.trim();
-    if(n.length < 3){ state.err = "Escribe tu nombre completo."; return render(); }
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c)){ state.err = "Escribe un correo válido, por ejemplo nombre@correo.com."; return render(); }
-    state.err = ""; state.step = 0;
-    if(nPreg(vacById(state.vacId)) === 0) return finalizar();
-    state.view = "pregunta"; render();
-  }
-  else if(act === "no-acepto"){ state.view = "nointeres"; render(); }
-  else if(act === "no-interes"){
+  const a = el.dataset.a;
+  if(a === "reiniciar"){ return inicio(); }
+  if(busy) return;
+  if(a === "vac"){ if(phase === "home") abrirVacante(el.dataset.id); }
+  else if(a === "reintentar"){ me("Reintentar"); cargaP = cargarVacantes(); carga.estado = ENDPOINT ? "cargando" : "listo"; mostrarVacantes(true); }
+  else if(a === "otras"){ me("Ver otras vacantes"); state.vacId = null; mostrarVacantes(false); }
+  else if(a === "tema"){ verTema(el.dataset.id); }
+  else if(a === "postular"){ postular(); }
+  else if(a === "no-interes"){
     const v = vacById(state.vacId);
     enviarResultado({ tipo: "no_interes", fecha: new Date().toISOString(), vacanteId: v.id, vacante: v.nombreRaw });
-    state.view = "nointeres"; render();
+    me("No por ahora");
+    if(await bot("¡Gracias por tu tiempo! 🙌 Cuando quieras retomar, aquí estaré.")) setPhase("fin");
   }
-  else if(act === "prev"){ state.step = Math.max(0, state.step - 1); state.err = ""; render(); }
-  else if(act === "next"){
+  else if(a === "no-acepto"){
+    me("No acepto");
+    if(await bot("Entendido. Sin tu autorización no podemos continuar con el proceso. Si cambias de opinión, aquí estaré 😊")) setPhase("fin");
+  }
+  else if(a === "acepto"){
+    me("Sí, autorizo");
+    reiniciarFiltro();
+    if(await bot("¡Perfecto! Empecemos con tus datos.", "¿Cuál es tu nombre completo?")) setPhase("nombre");
+  }
+  else if(a === "send"){ enviar(el.dataset.k); }
+  else if(a === "ans"){ const q = preguntaActual(); responder(q, el.dataset.v, el.dataset.v); }
+  else if(a === "undo"){
+    if(phase !== "pregunta" || state.step === 0) return;
+    state.step -= 1;
+    log.length = state.qStart[state.step] + 1;
+    renderLog(); setPhase("pregunta");
+  }
+});
+
+async function enviar(k){
+  const f = document.getElementById("inp"); if(!f || busy) return;
+  const valor = f.value;
+  if(k === "nombre"){
+    const n = valor.trim().replace(/\s+/g, " ");
+    if(n.length < 3) return error("Escribe tu nombre completo.");
+    state.datos.nombre = n; me(n);
+    if(await bot(`Mucho gusto, ${esc(n.split(" ")[0])} 😊`, "¿A qué correo te podemos escribir?")) setPhase("correo");
+  }
+  else if(k === "correo"){
+    const c = valor.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c)) return error("Escribe un correo válido, por ejemplo nombre@correo.com.");
+    state.datos.correo = c; me(c);
+    const n = nPreg(vacById(state.vacId));
+    if(n === 0) return finalizar();
+    if(!(await bot(n === 1 ? "¡Gracias! Solo una pregunta rápida para ver si tu perfil encaja." : `¡Gracias! Ahora ${n} preguntas rápidas para ver si tu perfil encaja. Puedes cambiar tu respuesta anterior si te equivocas.`))) return;
+    state.step = 0; preguntar();
+  }
+  else if(k === "texto"){
     const q = preguntaActual();
-    const txt = ((document.getElementById("txt") || {}).value || state.ans[q.id] || "");
-    state.ans[q.id] = txt;
     const minimo = Math.max(1, q.min);
-    if(txt.trim().length < minimo){ state.err = minimo > 1 ? "Cuéntanos un poco más para poder evaluar tu perfil." : "Escribe tu respuesta para continuar."; return render(); }
-    state.err = ""; avanzar();
+    if(valor.trim().length < minimo) return error(minimo > 1 ? "Cuéntanos un poco más para poder evaluar tu perfil." : "Escribe tu respuesta para continuar.");
+    responder(q, valor, valor.trim());
   }
-  else if(act === "ans"){
-    state.ans[preguntaActual().id] = el.dataset.v;
-    avanzar();
-  }
-  else if(act === "salario-ok"){
+  else if(k === "salario"){
     const q = preguntaActual();
-    const inp = document.getElementById("salario");
-    const digitos = ((inp ? inp.value : "") || "").replace(/\D/g, "");
+    const digitos = valor.replace(/\D/g, "");
     const moneda = q.tope > 0 ? q.moneda : state.moneda;
-    state.ans[q.id] = { monto: digitos, moneda };
-    const n = Number(digitos);
-    const m = monedaInfo(moneda);
-    if(!(n >= m.min && n <= m.max)){ state.err = `Escribe tu expectativa mensual completa en ${m.code}, por ejemplo ${m.ejemplo}.`; return render(); }
-    state.err = "";
-    avanzar();
+    const n = Number(digitos), m = monedaInfo(moneda);
+    if(!(n >= m.min && n <= m.max)){ state.ans[q.id] = { monto: digitos, moneda }; return error(`Escribe tu expectativa mensual completa en ${m.code}, por ejemplo ${m.ejemplo}.`); }
+    responder(q, { monto: digitos, moneda }, `${m.simbolo} ${fmtMonto(digitos)} ${m.code}`);
+  }
+}
+
+$comp.addEventListener("input", e => {
+  const t = e.target;
+  if(t.id !== "inp") return;
+  error("");
+  if(phase === "pregunta" && preguntaActual().tipo === "salario") t.value = fmtMonto(t.value.replace(/\D/g, "").slice(0, 10));
+  if(t.tagName === "TEXTAREA"){ autosize(t); contar(); }
+});
+$comp.addEventListener("change", e => {
+  if(e.target.id === "moneda"){
+    state.moneda = e.target.value;
+    const f = document.getElementById("inp");
+    if(f) f.placeholder = "Monto mensual, ej. " + monedaInfo(state.moneda).ejemplo;
   }
 });
-
-$app.addEventListener("input", e => {
-  if(e.target.id === "nombre") state.datos.nombre = e.target.value;
-  if(e.target.id === "correo") state.datos.correo = e.target.value;
-  if(e.target.id === "salario"){
-    const d = e.target.value.replace(/\D/g, "").slice(0, 10);
-    e.target.value = fmtMonto(d);
-  }
-  if(e.target.id === "txt"){ const q = preguntaActual(); if(q) state.ans[q.id] = e.target.value; }
+$comp.addEventListener("keydown", e => {
+  if(e.target.id !== "inp" || e.key !== "Enter" || e.isComposing) return;
+  // En respuestas abiertas, Enter hace salto de línea; Ctrl/⌘ + Enter envía.
+  if(e.target.tagName === "TEXTAREA" && !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  const b = $comp.querySelector('[data-a="send"]'); if(b) enviar(b.dataset.k);
 });
 
-$app.addEventListener("change", e => {
-  if(e.target.id === "okDatos"){ document.getElementById("btnAcepto").disabled = !e.target.checked; }
-  if(e.target.id === "moneda") state.moneda = e.target.value;
-});
-
-render();
-cargarVacantes();
+inicio();
 </script>
 </body>
 </html>
